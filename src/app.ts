@@ -5,7 +5,9 @@ import type { AppEnv, WorkerEnv } from '../config/bindings'
 import { createWorkosClient, type WorkosClient } from '@/tools/workos/client'
 import { createRequestTiming } from '@/middleware/requestTiming'
 import { createSessionMiddleware } from '@/middleware/session'
+import { requireRoutePolicy } from '@/middleware/rbacEnforce'
 import { authRoutes } from '@/routes/auth'
+import { dashboardRoutes } from '@/routes/dashboard'
 import { healthRoutes } from '@/routes/health'
 import { logger, serializeError } from '@/utils/logger'
 import { randomId } from '@/utils/ids'
@@ -51,9 +53,11 @@ export function createApp(): Hono<AppEnv> {
   })
   app.use('*', createRequestTiming())
   app.use('*', createSessionMiddleware())
+  app.use('*', requireRoutePolicy())
 
   app.route('/', healthRoutes)
   app.route('/', authRoutes)
+  app.route('/', dashboardRoutes)
 
   app.onError((err, c) => {
     logger.error('unhandled', { traceId: c.get('traceId'), ...serializeError(err) })

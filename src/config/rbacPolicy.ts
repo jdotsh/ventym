@@ -1,0 +1,53 @@
+import type { TenantRole } from '../../db/schema'
+
+export type PolicyEntry =
+  | { kind: 'public' }
+  | { kind: 'authenticated' }
+  | { kind: 'roles'; roles: readonly TenantRole[] }
+
+const PUBLIC: PolicyEntry = { kind: 'public' }
+const AUTHENTICATED: PolicyEntry = { kind: 'authenticated' }
+
+/**
+ * The single source of truth for route → access. Every route MUST appear here;
+ * an absent route is DENIED (fail-closed). Keyed by `METHOD /route-pattern`.
+ */
+export const RBAC_POLICY: Readonly<Record<string, PolicyEntry>> = {
+  'GET /health': PUBLIC,
+  'GET /health/ready': PUBLIC,
+  'GET /auth/login': PUBLIC,
+  'GET /auth/callback': PUBLIC,
+  'POST /auth/logout': AUTHENTICATED,
+  'GET /dashboard': AUTHENTICATED,
+}
+
+export type RbacDecision = { kind: 'allow' } | { kind: 'login' } | { kind: 'forbidden' }
+
+/** Pure decision core — exhaustively testable, no I/O. */
+export function decideRbac(
+  entry: PolicyEntry | undefined,
+  ctx: { authenticated: boolean; roles: readonly TenantRole[] },
+): RbacDecision {
+  if (!entry) return { kind: 'forbidden' } // fail-closed
+  if (entry.kind === 'public') return { kind: 'allow' }
+  if (!ctx.authenticated) return { kind: 'login' }
+  if (entry.kind === 'authenticated') return { kind: 'allow' }
+  return entry.roles.some((r) => ctx.roles.includes(r)) ? { kind: 'allow' } : { kind: 'forbidden' }
+}
+
+/** Resolve the policy for a request: exact match first, then `:param` patterns. */
+export function policyFor(method: string, path: string): PolicyEntry | undefined {
+  const exact = RBAC_POLICY[`${method} ${path}`]
+  if (exact) return exact
+  for (const [key, entry] of Object.entries(RBAC_POLICY)) {
+    const [m, pattern] = key.split(' ')
+    if (m === method && pattern && matchesPattern(pattern, path)) return entry
+  }
+  return undefined
+}
+
+function matchesPattern(pattern: string, path: string): boolean {
+  const p = pattern.split('/')
+  const a = path.split('/')
+  return p.length === a.length && p.every((seg, i) => seg.startsWith(':') || seg === a[i])
+}
