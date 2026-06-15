@@ -110,15 +110,18 @@ export const apiToken = pgTable('api_token', {
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
 })
 
-// Idempotency store: first response per (tenant, key) — safe replay for agents.
+// Idempotency store: claim-first per (tenant, key). status_code/response_json are
+// NULL while a request is in flight (claimed), set on completion (safe replay).
+export type StoredResponse = { body: string; ct: string }
 export const idempotency = pgTable(
   'idempotency',
   {
     id,
     tenantId,
     idemKey: varchar('idem_key', { length: 200 }).notNull(),
-    statusCode: integer('status_code').notNull(),
-    responseJson: jsonb('response_json').notNull(),
+    requestFingerprint: varchar('request_fingerprint', { length: 64 }), // sha256(method:path:body)
+    statusCode: integer('status_code'), // NULL = claimed / in-progress
+    responseJson: jsonb('response_json').$type<StoredResponse>(),
     createdAt,
   },
   (t) => [uniqueIndex('idempotency_tenant_key').on(t.tenantId, t.idemKey)],

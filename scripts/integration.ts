@@ -8,7 +8,8 @@
  */
 import { sql } from 'drizzle-orm'
 import { createDatabase, withTenantScope } from '../config/db'
-import { appUser, eventLog, tenant, timesheet, workOrder } from '../db/schema'
+import { appUser, eventLog, idempotency, tenant, timesheet, workOrder } from '../db/schema'
+import { createIdempotencyRepo } from '../src/tools/db/idempotencyRepo'
 import { buildWorkOrderDeps } from '../src/services/workOrder/deps'
 import { createWorkOrder, getWorkOrder, transitionWorkOrder } from '../src/services/workOrder/service'
 import { buildTimesheetDeps } from '../src/services/timesheet/deps'
@@ -133,7 +134,29 @@ async function main(): Promise<void> {
     .limit(1)
   check('TIMESHEET_LINE_APPROVED event at wo_line grain (the value event)', apprEv !== undefined)
 
-  // Cleanup (FK order: events → timesheets → work orders [lines cascade] → tenants → users).
+  // 6. Durable idempotency (claim-first: claimed → replay → mismatch → in-progress).
+  const idem = createIdempotencyRepo(app)
+  const claim = (key: string, fp: string) =>
+    withTenantScope(app, { tenantId: t1.id, userId: u.id, sessionId: 'idem' }, (tx) =>
+      idem.claim(tx, { tenantId: t1.id, key, fingerprint: fp }),
+    )
+  const k1 = crypto.randomUUID()
+  const r1 = await claim(k1, 'fp-A')
+  check('idempotency: first claim is claimed', r1.kind === 'claimed')
+  await withTenantScope(app, { tenantId: t1.id, userId: u.id, sessionId: 'idem' }, (tx) =>
+    idem.complete(tx, { tenantId: t1.id, key: k1, statusCode: 201, body: '{"data":"ok"}', contentType: 'application/json' }),
+  )
+  const r2 = await claim(k1, 'fp-A')
+  check('idempotency: replay returns the original response', r2.kind === 'replay' && r2.statusCode === 201 && r2.body === '{"data":"ok"}')
+  const r3 = await claim(k1, 'fp-DIFFERENT')
+  check('idempotency: same key + different body → mismatch', r3.kind === 'mismatch')
+  const k2 = crypto.randomUUID()
+  await claim(k2, 'fp-X') // claimed, never completed
+  const r4 = await claim(k2, 'fp-X')
+  check('idempotency: uncompleted claim → in_progress', r4.kind === 'in_progress')
+
+  // Cleanup (FK order: events → timesheets → work orders [lines cascade] → idem → tenants → users).
+  await owner.delete(idempotency).where(sql`${idempotency.tenantId} IN (${t1.id}, ${t2.id})`)
   await owner.delete(eventLog).where(sql`${eventLog.tenantId} IN (${t1.id}, ${t2.id})`)
   await owner.delete(timesheet).where(sql`${timesheet.tenantId} IN (${t1.id}, ${t2.id})`)
   await owner.delete(workOrder).where(sql`${workOrder.tenantId} IN (${t1.id}, ${t2.id})`)

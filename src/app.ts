@@ -10,6 +10,7 @@ import { createSecurityHeaders } from '@/middleware/security'
 import { createRateLimit } from '@/middleware/rateLimit'
 import { createSessionMiddleware } from '@/middleware/session'
 import { createCsrf } from '@/middleware/csrf'
+import { createIdempotency } from '@/middleware/idempotency'
 import { requireRoutePolicy } from '@/middleware/rbacEnforce'
 import { authRoutes } from '@/routes/auth'
 import { adminRoutes } from '@/routes/admin'
@@ -83,6 +84,7 @@ export function createApp(): Hono<AppEnv> {
   app.use('*', createSessionMiddleware())
   app.use('*', createCsrf()) // after session: CSRF applies only to cookie-authed mutations
   app.use('*', requireRoutePolicy())
+  app.use('/api/*', createIdempotency()) // after RBAC: only authorized mutations claim keys
 
   app.route('/', healthRoutes)
   app.route('/', authRoutes)
