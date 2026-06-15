@@ -4,6 +4,7 @@ import { createDatabase, type Database } from '../config/db'
 import type { AppEnv, WorkerEnv } from '../config/bindings'
 import { createWorkosClient, type WorkosClient } from '@/tools/workos/client'
 import { createAgentVerifier, type AgentVerifier } from '@/tools/workos/agentAuth'
+import { createTraceId } from '@/middleware/traceId'
 import { createRequestTiming } from '@/middleware/requestTiming'
 import { createSecurityHeaders } from '@/middleware/security'
 import { createRateLimit } from '@/middleware/rateLimit'
@@ -17,7 +18,8 @@ import { mcpRoutes } from '@/routes/mcp'
 import { viewRoutes } from '@/routes/views'
 import { healthRoutes } from '@/routes/health'
 import { logger, serializeError } from '@/utils/logger'
-import { randomId } from '@/utils/ids'
+import { appErrorToProblem, problemResponse } from '@/utils/problemResponse'
+import { isAppError } from '@/types/errors'
 
 // Resolve config + DB + WorkOS once per isolate, not per request.
 let cachedConfig: AppConfig | undefined
@@ -58,9 +60,9 @@ function resolveDb(env: WorkerEnv, config: AppConfig): Database {
 export function createApp(): Hono<AppEnv> {
   const app = new Hono<AppEnv>()
 
+  app.use('*', createTraceId()) // FIRST — every log line correlates by trace id
   app.use('*', async (c, next) => {
     const config = resolveConfig(c.env)
-    c.set('traceId', c.req.header('x-trace-id') ?? randomId())
     c.set('config', config)
     c.set('db', resolveDb(c.env, config))
     c.set('workos', resolveWorkos(config))
@@ -85,8 +87,14 @@ export function createApp(): Hono<AppEnv> {
   app.route('/', adminRoutes)
 
   app.onError((err, c) => {
-    logger.error('unhandled', { traceId: c.get('traceId'), ...serializeError(err) })
-    return c.json({ error: { code: 'INTERNAL', message: 'Internal error' } }, 500)
+    const traceId = c.get('traceId')
+    if (isAppError(err)) {
+      const level = err.statusCode >= 500 ? 'error' : 'warn'
+      logger[level]('app_error', { traceId, code: err.code, ...serializeError(err) })
+      return appErrorToProblem(err, traceId)
+    }
+    logger.error('unhandled', { traceId, ...serializeError(err) })
+    return problemResponse(traceId, 'INTERNAL')
   })
 
   return app
