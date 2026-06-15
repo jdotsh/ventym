@@ -15,6 +15,7 @@ import { adminRoutes } from '@/routes/admin'
 import { webhookRoutes } from '@/routes/webhooks'
 import { agentRoutes } from '@/routes/agent'
 import { mcpRoutes } from '@/routes/mcp'
+import { openapiRoutes } from '@/routes/openapi'
 import { viewRoutes } from '@/routes/views'
 import { healthRoutes } from '@/routes/health'
 import { logger, serializeError } from '@/utils/logger'
@@ -83,6 +84,7 @@ export function createApp(): Hono<AppEnv> {
   app.route('/', webhookRoutes)
   app.route('/', agentRoutes)
   app.route('/', mcpRoutes)
+  app.route('/', openapiRoutes)
   app.route('/', viewRoutes)
   app.route('/', adminRoutes)
 
