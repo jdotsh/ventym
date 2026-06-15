@@ -17,6 +17,7 @@ import { webhookRoutes } from '@/routes/webhooks'
 import { agentRoutes } from '@/routes/agent'
 import { mcpRoutes } from '@/routes/mcp'
 import { workOrderApiRoutes } from '@/routes/api/v1/workOrders'
+import { timesheetApiRoutes } from '@/routes/api/v1/timesheets'
 import { openapiRoutes } from '@/routes/openapi'
 import { viewRoutes } from '@/routes/views'
 import { healthRoutes } from '@/routes/health'
@@ -89,6 +90,7 @@ export function createApp(): Hono<AppEnv> {
   app.route('/', agentRoutes)
   app.route('/', mcpRoutes)
   app.route('/', workOrderApiRoutes)
+  app.route('/', timesheetApiRoutes)
   app.route('/', openapiRoutes)
   app.route('/', viewRoutes)
   app.route('/', adminRoutes)

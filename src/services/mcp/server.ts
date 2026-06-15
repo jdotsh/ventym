@@ -9,6 +9,10 @@ import { buildWorkOrderDeps } from '@/services/workOrder/deps'
 import { createWorkOrder, getWorkOrder, transitionWorkOrder } from '@/services/workOrder/service'
 import { createWorkOrderSchema } from '@/services/workOrder/schema'
 import { WO_TRANSITIONS } from '@/services/workOrder/machine'
+import { buildTimesheetDeps } from '@/services/timesheet/deps'
+import { createTimesheet, getTimesheet, transitionTimesheet } from '@/services/timesheet/service'
+import { createTimesheetSchema } from '@/services/timesheet/schema'
+import { TIMESHEET_TRANSITIONS } from '@/services/timesheet/machine'
 
 // Minimal MCP over JSON-RPC 2.0 (Streamable HTTP). Stateless: one request → one
 // response. Covers initialize / tools.list / tools.call — enough for a governed
@@ -54,6 +58,14 @@ const transitionArgsSchema = z.object({
   id: z.string().uuid(),
   transition: z.enum(WO_TRANSITIONS),
   expectedVersion: z.number().int().min(1),
+  idempotencyKey: z.string().optional(),
+})
+
+const tsTransitionArgsSchema = z.object({
+  id: z.string().uuid(),
+  transition: z.enum(TIMESHEET_TRANSITIONS),
+  expectedVersion: z.number().int().min(1),
+  reason: z.string().optional(),
   idempotencyKey: z.string().optional(),
 })
 
@@ -128,6 +140,65 @@ const TOOLS: readonly McpTool[] = [
         ctx,
         { workOrderId: a.id, transition: a.transition, expectedVersion: a.expectedVersion, eventId: a.idempotencyKey ?? crypto.randomUUID() },
         buildWorkOrderDeps(deps.db, 'agent'),
+      )
+      return result.ok ? result.value : { error: result.error.kind }
+    },
+  },
+  {
+    name: 'get_timesheet',
+    description: 'Fetch a timesheet by id (tenant-scoped).',
+    inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+    scope: 'read',
+    run: async (ctx, deps, args) => {
+      const { id } = z.object({ id: z.string().uuid() }).parse(args)
+      const ts = await getTimesheet(ctx, id, buildTimesheetDeps(deps.db, 'agent'))
+      return ts ?? { error: 'not_found' }
+    },
+  },
+  {
+    name: 'create_timesheet',
+    description: 'Create a draft timesheet for a work order line. Requires MANAGER.',
+    inputSchema: {
+      type: 'object',
+      properties: { workOrderLineId: { type: 'string' }, periodStart: { type: 'string' }, periodEnd: { type: 'string' }, lines: { type: 'array' } },
+      required: ['workOrderLineId', 'periodStart', 'periodEnd', 'lines'],
+    },
+    requiredRole: 'MANAGER',
+    scope: 'write',
+    run: async (ctx, deps, args) => {
+      const input = createTimesheetSchema.parse(args)
+      const result = await createTimesheet(ctx, input, buildTimesheetDeps(deps.db, 'agent'))
+      return result.ok ? result.value : { error: result.error.kind }
+    },
+  },
+  {
+    name: 'transition_timesheet',
+    description: 'Submit/approve/reject/revise a timesheet. Requires MANAGER. SoD: approver ≠ submitter.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        transition: { type: 'string', enum: TIMESHEET_TRANSITIONS },
+        expectedVersion: { type: 'integer' },
+        reason: { type: 'string' },
+        idempotencyKey: { type: 'string' },
+      },
+      required: ['id', 'transition', 'expectedVersion'],
+    },
+    requiredRole: 'MANAGER',
+    scope: 'write',
+    run: async (ctx, deps, args) => {
+      const a = tsTransitionArgsSchema.parse(args)
+      const result = await transitionTimesheet(
+        ctx,
+        {
+          timesheetId: a.id,
+          transition: a.transition,
+          expectedVersion: a.expectedVersion,
+          eventId: a.idempotencyKey ?? crypto.randomUUID(),
+          ...(a.reason ? { reason: a.reason } : {}),
+        },
+        buildTimesheetDeps(deps.db, 'agent'),
       )
       return result.ok ? result.value : { error: result.error.kind }
     },

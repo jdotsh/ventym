@@ -41,10 +41,19 @@ describe('handleMcpRequest', () => {
     expect(names).toContain('list_members')
   })
 
-  it('exposes the work-order tools', async () => {
+  it('exposes the work-order and timesheet tools', async () => {
     const r = await call('tools/list')
     const names = (r?.result as { tools: { name: string }[] }).tools.map((t) => t.name)
-    expect(names).toEqual(expect.arrayContaining(['get_work_order', 'create_work_order', 'transition_work_order']))
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'get_work_order',
+        'create_work_order',
+        'transition_work_order',
+        'get_timesheet',
+        'create_timesheet',
+        'transition_timesheet',
+      ]),
+    )
   })
 
   it('fail-closed: a MEMBER agent cannot create or transition work orders', async () => {

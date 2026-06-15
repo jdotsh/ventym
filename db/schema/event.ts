@@ -6,6 +6,7 @@ import { tenant, type ActorKind } from '../schema'
 export const EVENT_TYPES = [
   'WORK_ORDER_LINE_COMMITTED',
   'WORK_ORDER_VALIDATED',
+  'TIMESHEET_SUBMITTED',
   'TIMESHEET_LINE_APPROVED',
   'MILESTONE_ACCEPTED',
   'ERP_GOODS_RECEIPT_POSTED',

@@ -6,9 +6,11 @@
  */
 import { sql } from 'drizzle-orm'
 import { createDatabase, withTenantScope } from '../config/db'
-import { appUser, eventLog, tenant, workOrder } from '../db/schema'
+import { appUser, eventLog, tenant, timesheet, workOrder } from '../db/schema'
 import { buildWorkOrderDeps } from '../src/services/workOrder/deps'
 import { createWorkOrder, getWorkOrder, transitionWorkOrder } from '../src/services/workOrder/service'
+import { buildTimesheetDeps } from '../src/services/timesheet/deps'
+import { createTimesheet, transitionTimesheet } from '../src/services/timesheet/service'
 import type { SessionContext } from '../src/services/identity/service'
 
 const OWNER = process.env.OWNER ?? 'postgres://vms:vms@localhost:5433/vms'
@@ -91,11 +93,50 @@ async function main(): Promise<void> {
   }
   check('event_log UPDATE is rejected (append-only)', immutable)
 
-  // Cleanup (FK order: events → work orders [lines cascade] → tenants → user).
+  // 5. Timesheet value loop (dual-surface write + maker-checker SoD).
+  const [u2] = await owner.insert(appUser).values({ email: `appr_${sfx}@x.test`, displayName: 'Approver' }).returning()
+  if (!u2) throw new Error('seed approver failed')
+  const approver: SessionContext = { ...ctx, userId: u2.id, sessionId: `sess2_${sfx}` }
+  const line0 = created.value.lines[0]
+  if (!line0) throw new Error('no wo line')
+  const tdeps = buildTimesheetDeps(app, 'agent')
+
+  const tsRes = await createTimesheet(
+    ctx,
+    {
+      workOrderLineId: line0.id,
+      periodStart: '2026-01-01',
+      periodEnd: '2026-01-31',
+      lines: [{ workDate: '2026-01-05', hours: 8 }, { workDate: '2026-01-06', hours: 8 }],
+    },
+    tdeps,
+  )
+  check('createTimesheet costed from the WO line rate (1000.00)', tsRes.ok && tsRes.value.timesheet.totalExcl === '1000.00')
+  if (!tsRes.ok) throw new Error('ts create failed: ' + tsRes.error.kind)
+  const tsId = tsRes.value.timesheet.id
+
+  const sub = await transitionTimesheet(ctx, { timesheetId: tsId, transition: 'submit', expectedVersion: 1, eventId: crypto.randomUUID() }, tdeps)
+  check('timesheet submit → SUBMITTED', sub.ok && sub.value.status === 'SUBMITTED')
+
+  const selfApprove = await transitionTimesheet(ctx, { timesheetId: tsId, transition: 'approve', expectedVersion: 2, eventId: crypto.randomUUID() }, tdeps)
+  check('SoD: submitter cannot self-approve', !selfApprove.ok && selfApprove.error.kind === 'sod_violation')
+
+  const appr = await transitionTimesheet(approver, { timesheetId: tsId, transition: 'approve', expectedVersion: 2, eventId: crypto.randomUUID() }, tdeps)
+  check('approve by a different referent → APPROVED', appr.ok && appr.value.status === 'APPROVED' && appr.value.approvedByUserId === u2.id)
+
+  const [apprEv] = await owner
+    .select()
+    .from(eventLog)
+    .where(sql`${eventLog.eventType} = 'TIMESHEET_LINE_APPROVED' AND ${eventLog.woLineId} = ${line0.id}`)
+    .limit(1)
+  check('TIMESHEET_LINE_APPROVED event at wo_line grain (the value event)', apprEv !== undefined)
+
+  // Cleanup (FK order: events → timesheets → work orders [lines cascade] → tenants → users).
   await owner.delete(eventLog).where(sql`${eventLog.tenantId} IN (${t1.id}, ${t2.id})`)
+  await owner.delete(timesheet).where(sql`${timesheet.tenantId} IN (${t1.id}, ${t2.id})`)
   await owner.delete(workOrder).where(sql`${workOrder.tenantId} IN (${t1.id}, ${t2.id})`)
   await owner.delete(tenant).where(sql`${tenant.id} IN (${t1.id}, ${t2.id})`)
-  await owner.delete(appUser).where(sql`${appUser.id} = ${u.id}`)
+  await owner.delete(appUser).where(sql`${appUser.id} IN (${u.id}, ${u2.id})`)
 
   console.log(`\n${passed} passed, ${failed} failed`)
   process.exit(failed === 0 ? 0 : 1)

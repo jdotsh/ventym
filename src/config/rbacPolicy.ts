@@ -33,6 +33,13 @@ export const RBAC_POLICY: Readonly<Record<string, PolicyEntry>> = {
   'POST /api/v1/work-orders': roles('ADMIN', 'MANAGER'),
   'POST /api/v1/work-orders/:id/transitions': roles('ADMIN', 'MANAGER'),
   'GET /api/v1/work-orders/:id': AUTHENTICATED,
+  // Timesheet — vendor enters/submits (MEMBER+); the technical referent approves (MANAGER).
+  'POST /api/v1/timesheets': roles('ADMIN', 'MANAGER', 'MEMBER'),
+  'POST /api/v1/timesheets/:id/submit': roles('ADMIN', 'MANAGER', 'MEMBER'),
+  'POST /api/v1/timesheets/:id/approve': roles('ADMIN', 'MANAGER'),
+  'POST /api/v1/timesheets/:id/reject': roles('ADMIN', 'MANAGER'),
+  'POST /api/v1/timesheets/:id/revise': roles('ADMIN', 'MANAGER', 'MEMBER'),
+  'GET /api/v1/timesheets/:id': AUTHENTICATED,
   'GET /admin/users': roles('ADMIN'),
   'POST /admin/users/:id/roles': roles('ADMIN'),
   'POST /admin/sso/portal': roles('ADMIN'),

@@ -72,6 +72,14 @@ export const DOMAIN_REGISTRY = {
   WO_DUPLICATE_CODE: { grpc: 'ALREADY_EXISTS', description: 'A work order with this code already exists' },
   WO_INVALID_TRANSITION: { grpc: 'FAILED_PRECONDITION', description: 'Illegal lifecycle transition for current state' },
   WO_VERSION_CONFLICT: { grpc: 'ABORTED', description: 'Optimistic-lock version mismatch; reload and retry' },
+  // Timesheet
+  TS_NOT_FOUND: { grpc: 'NOT_FOUND', description: 'Timesheet not found in tenant scope' },
+  TS_WO_LINE_NOT_FOUND: { grpc: 'NOT_FOUND', description: 'Work order line referenced by the timesheet not found' },
+  TS_DUPLICATE_PERIOD: { grpc: 'ALREADY_EXISTS', description: 'A timesheet already exists for this line and period' },
+  TS_INVALID_TRANSITION: { grpc: 'FAILED_PRECONDITION', description: 'Illegal timesheet transition for current state' },
+  TS_VERSION_CONFLICT: { grpc: 'ABORTED', description: 'Optimistic-lock version mismatch; reload and retry' },
+  SOD_VIOLATION: { grpc: 'PERMISSION_DENIED', description: 'Separation of duties: the approver cannot be the submitter' },
+  REASON_REQUIRED: { grpc: 'INVALID_ARGUMENT', description: 'A reason is required for this action' },
   // Auth / authz
   UNAUTHORIZED: { grpc: 'UNAUTHENTICATED', description: 'Session missing or invalid' },
   FORBIDDEN: { grpc: 'PERMISSION_DENIED', description: 'Authenticated but not authorised for this action' },
