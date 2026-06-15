@@ -143,3 +143,11 @@ export const auditLog = pgTable('audit_log', {
 // Tables whose rows are isolated by the `app.tenant_id` GUC (see RLS migration).
 export const TENANT_SCOPED_TABLES = ['membership', 'session', 'api_token', 'idempotency'] as const
 
+// ─── Domain aggregates (one file per aggregate; barrel re-export) ──────────────
+// Defined after the foundation tables so their `references(() => tenant.id)` see
+// an initialised `tenant` binding during module evaluation.
+export * from './schema/workOrder'
+export * from './schema/event'
+export * from './schema/governance'
+export * from './schema/sensitive'
+

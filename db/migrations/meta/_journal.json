@@ -8,6 +8,13 @@
       "when": 1781548905837,
       "tag": "0000_bumpy_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781559243447,
+      "tag": "0001_funny_garia",
+      "breakpoints": true
     }
   ]
 }
