@@ -1,5 +1,7 @@
 import type { AppConfig } from './env'
 import type { Database } from './db'
+import type { WorkosClient } from '@/tools/workos/client'
+import type { SessionContext } from '@/services/identity/service'
 
 /** Raw Cloudflare Worker env: vars + secrets + bindings. */
 export type WorkerEnv = {
@@ -18,6 +20,8 @@ export type AppVariables = {
   traceId: string
   config: AppConfig
   db: Database
+  workos: WorkosClient
+  session: SessionContext | null // null = anonymous
 }
 
 export type AppEnv = { Bindings: WorkerEnv; Variables: AppVariables }

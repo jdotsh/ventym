@@ -2,16 +2,28 @@ import { Hono } from 'hono'
 import { parseConfig, type AppConfig } from '../config/env'
 import { createDatabase, type Database } from '../config/db'
 import type { AppEnv, WorkerEnv } from '../config/bindings'
+import { createWorkosClient, type WorkosClient } from '@/tools/workos/client'
 import { createRequestTiming } from '@/middleware/requestTiming'
+import { createSessionMiddleware } from '@/middleware/session'
+import { authRoutes } from '@/routes/auth'
 import { healthRoutes } from '@/routes/health'
 import { logger, serializeError } from '@/utils/logger'
 import { randomId } from '@/utils/ids'
 
-// Resolve config + DB once per isolate, not per request.
+// Resolve config + DB + WorkOS once per isolate, not per request.
 let cachedConfig: AppConfig | undefined
 let cachedDb: Database | undefined
+let cachedWorkos: WorkosClient | undefined
 
 const resolveConfig = (env: WorkerEnv): AppConfig => (cachedConfig ??= parseConfig(env))
+
+const resolveWorkos = (config: AppConfig): WorkosClient =>
+  (cachedWorkos ??= createWorkosClient({
+    apiKey: config.WORKOS_API_KEY,
+    clientId: config.WORKOS_CLIENT_ID,
+    redirectUri: config.WORKOS_REDIRECT_URI,
+    cookiePassword: config.SESSION_SECRET,
+  }))
 
 function resolveDb(env: WorkerEnv, config: AppConfig): Database {
   if (cachedDb) return cachedDb
@@ -34,11 +46,14 @@ export function createApp(): Hono<AppEnv> {
     c.set('traceId', c.req.header('x-trace-id') ?? randomId())
     c.set('config', config)
     c.set('db', resolveDb(c.env, config))
+    c.set('workos', resolveWorkos(config))
     await next()
   })
   app.use('*', createRequestTiming())
+  app.use('*', createSessionMiddleware())
 
   app.route('/', healthRoutes)
+  app.route('/', authRoutes)
 
   app.onError((err, c) => {
     logger.error('unhandled', { traceId: c.get('traceId'), ...serializeError(err) })
