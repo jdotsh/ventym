@@ -1,5 +1,6 @@
 import { RBAC_POLICY, type PolicyEntry } from '@/config/rbacPolicy'
 import { DOMAIN_REGISTRY } from '@/types/errorRegistry'
+import { isApiPath } from '@/utils/apiPaths'
 
 /**
  * OpenAPI 3.1 generated from the two SSOTs: RBAC_POLICY (paths + security) and
@@ -8,7 +9,6 @@ import { DOMAIN_REGISTRY } from '@/types/errorRegistry'
  * response body schemas (Zod → JSON Schema) attach per-endpoint as they land.
  */
 
-const API_PREFIXES = ['/api/', '/agent/', '/mcp', '/webhooks/', '/.well-known/']
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const
 type HttpMethod = (typeof HTTP_METHODS)[number]
 
@@ -32,8 +32,6 @@ export type OpenApiDocument = {
 function isHttpMethod(value: string): value is HttpMethod {
   return (HTTP_METHODS as readonly string[]).includes(value)
 }
-
-const isDocumentable = (path: string): boolean => API_PREFIXES.some((p) => path === p || path.startsWith(p))
 
 const toOpenApiPath = (path: string): string => path.replace(/:(\w+)/g, '{$1}')
 
@@ -94,7 +92,7 @@ export function buildOpenApiDocument(opts: { serverUrl?: string } = {}): OpenApi
   const paths: Record<string, PathItem> = {}
   for (const [key, entry] of Object.entries(RBAC_POLICY)) {
     const [method, rawPath] = key.split(' ')
-    if (!method || !rawPath || !isDocumentable(rawPath)) continue
+    if (!method || !rawPath || !isApiPath(rawPath)) continue
     const m = method.toLowerCase()
     if (!isHttpMethod(m)) continue
     const openApiPath = toOpenApiPath(rawPath)
