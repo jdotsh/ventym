@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { parseConfig, type AppConfig } from '../config/env'
-import { createDatabase, type Database } from '../config/db'
+import { assertRlsEnforced, createDatabase, type Database } from '../config/db'
 import type { AppEnv, WorkerEnv } from '../config/bindings'
 import { createWorkosClient, type WorkosClient } from '@/tools/workos/client'
 import { createAgentVerifier, type AgentVerifier } from '@/tools/workos/agentAuth'
@@ -32,6 +32,7 @@ let cachedConfig: AppConfig | undefined
 let cachedDb: Database | undefined
 let cachedWorkos: WorkosClient | undefined
 let cachedAgentVerifier: AgentVerifier | undefined
+let rlsGuard: Promise<void> | undefined // fail-closed RLS-role check, once per isolate
 
 const resolveConfig = (env: WorkerEnv): AppConfig => (cachedConfig ??= parseConfig(env))
 
@@ -69,10 +70,12 @@ export function createApp(): Hono<AppEnv> {
   app.use('*', createTraceId()) // FIRST — every log line correlates by trace id
   app.use('*', async (c, next) => {
     const config = resolveConfig(c.env)
+    const db = resolveDb(c.env, config)
     c.set('config', config)
-    c.set('db', resolveDb(c.env, config))
+    c.set('db', db)
     c.set('workos', resolveWorkos(config))
     c.set('agentVerifier', resolveAgentVerifier(config))
+    await (rlsGuard ??= assertRlsEnforced(db)) // boot-fail if the app role bypasses RLS
     await next()
   })
   app.use('*', createSecurityHeaders())

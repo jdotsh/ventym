@@ -16,6 +16,7 @@ jobs:
       - run: bun run typecheck
       - run: bun run lint
       - run: bun run gate:rbac # every route is governed by RBAC_POLICY
+      - run: bun run gate:mcp # every MCP tool derives RBAC from RBAC_POLICY
       - run: bun run gate:secrets # no committed credentials
       - run: bun run test
 

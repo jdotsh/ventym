@@ -12,8 +12,9 @@
     "test": "vitest run",
     "test:integration": "bun scripts/integration.ts",
     "gate:rbac": "tsx scripts/check-rbac-coverage.ts",
+    "gate:mcp": "tsx scripts/check-mcp-coverage.ts",
     "gate:secrets": "bash scripts/secret-scan.sh",
-    "ci": "bun run typecheck && bun run lint && bun run gate:rbac && bun run gate:secrets && bun run test",
+    "ci": "bun run typecheck && bun run lint && bun run gate:rbac && bun run gate:mcp && bun run gate:secrets && bun run test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx db/seed.ts"

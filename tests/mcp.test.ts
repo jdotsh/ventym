@@ -51,7 +51,9 @@ describe('handleMcpRequest', () => {
         'transition_work_order',
         'get_timesheet',
         'create_timesheet',
-        'transition_timesheet',
+        'submit_timesheet',
+        'approve_timesheet',
+        'reject_timesheet',
         'link_purchase_order',
         'book_timesheet',
       ]),
@@ -63,8 +65,16 @@ describe('handleMcpRequest', () => {
       const r = await call('tools/call', { name })
       const result = r?.result as { isError: boolean; content: { text: string }[] }
       expect(result.isError).toBe(true)
-      expect(result.content[0]?.text).toContain('requires role MANAGER')
+      expect(result.content[0]?.text).toContain('Forbidden')
     }
+  })
+
+  it('governance is single-sourced: an ADMIN agent may create a WO over MCP (matches the API)', async () => {
+    // RBAC_POLICY allows ADMIN|MANAGER to create; MCP derives from it, so this is
+    // allowed (it fails later on the stub DB, not on authz). Previously diverged.
+    const r = await callAs(session(['ADMIN']), 'create_work_order', { code: 'WO', lines: [] })
+    const text = (r?.result as { content: { text: string }[] }).content[0]?.text ?? ''
+    expect(text).not.toContain('Forbidden')
   })
 
   it('per-token scope: a read-scoped agent is denied a write tool', async () => {
@@ -96,7 +106,7 @@ describe('handleMcpRequest', () => {
     const r = await call('tools/call', { name: 'list_members' })
     const result = r?.result as { content: { text: string }[]; isError: boolean }
     expect(result.isError).toBe(true)
-    expect(result.content[0]?.text).toContain('requires role ADMIN')
+    expect(result.content[0]?.text).toContain('Forbidden')
   })
 
   it('unknown tool → JSON-RPC error', async () => {

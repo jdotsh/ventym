@@ -13,6 +13,28 @@ export function createDatabase(connectionString: string): Database {
   return drizzle(client, { schema })
 }
 
+/**
+ * Fail-closed guard: assert the app connects as a role that RLS actually
+ * constrains — i.e. NOT a BYPASSRLS role and NOT a public-table owner (owners
+ * bypass RLS via ownership). Misconfigure the connection to the owner and RLS
+ * silently no-ops; this turns that into a loud boot failure. Run once per isolate.
+ */
+export async function assertRlsEnforced(db: Database): Promise<void> {
+  const result = await db.execute(sql`
+    SELECT current_user AS role,
+      COALESCE((SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user), false) AS bypass,
+      EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tableowner = current_user) AS owns
+  `)
+  const row = result[0] as { role: string; bypass: boolean; owns: boolean } | undefined
+  if (!row) throw new Error('RLS guard: could not resolve current_user')
+  if (row.bypass || row.owns) {
+    const why = row.bypass ? 'has BYPASSRLS' : 'owns public tables'
+    throw new Error(
+      `RLS is NOT enforced: the app connects as '${row.role}' which ${why} and bypasses row-level security. Connect as the non-owner vms_app role.`,
+    )
+  }
+}
+
 export type TenantScope = { tenantId: string; userId: string; sessionId: string }
 
 /**
