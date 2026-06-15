@@ -16,9 +16,12 @@ export const COMPONENTS = `
   padding:var(--sp-5);box-shadow:var(--shadow)}
 .field{display:block}
 .field>span{display:block;font-size:13px;font-weight:500;margin-bottom:var(--sp-1)}
-input,select{width:100%;height:40px;padding:0 var(--sp-3);border:1px solid var(--border-strong);
-  border-radius:var(--r-md);font:inherit;background:var(--raised);color:var(--ink)}
+input:not([type=checkbox]),select{width:100%;height:40px;padding:0 var(--sp-3);
+  border:1px solid var(--border-strong);border-radius:var(--r-md);font:inherit;
+  background:var(--raised);color:var(--ink)}
 input:focus,select:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 3px var(--navy-50)}
+.rolechk{display:inline-flex;align-items:center;gap:4px;font-size:13px}
+.flex-wrap{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2)}
 .table{width:100%;border-collapse:collapse;font-size:13px}
 .table th{text-align:left;color:var(--ink-soft);font-weight:500;padding:var(--sp-2) var(--sp-3);
   border-bottom:1px solid var(--border)}

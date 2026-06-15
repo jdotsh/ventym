@@ -14,6 +14,18 @@ const en: Dict = {
   'dash.tenant': 'Tenant',
   'dash.roles': 'Roles',
   'dash.activeRole': 'Active role',
+  'nav.admin': 'Admin',
+  'admin.title': 'Users & access',
+  'admin.user': 'User',
+  'admin.roles': 'Roles',
+  'admin.save': 'Save',
+  'admin.sso': 'Configure SSO',
+  'admin.flash.ok': 'Roles updated.',
+  'admin.flash.conflict': 'Someone changed this user first — reload and retry.',
+  'admin.flash.notFound': 'User not found.',
+  'admin.flash.invalid': 'Invalid roles.',
+  'admin.flash.no_org': 'No WorkOS organization configured for this tenant.',
+  'admin.flash.portal_error': 'Could not open the WorkOS Admin Portal.',
 }
 
 const it: Dict = {
@@ -29,6 +41,18 @@ const it: Dict = {
   'dash.tenant': 'Organizzazione',
   'dash.roles': 'Ruoli',
   'dash.activeRole': 'Ruolo attivo',
+  'nav.admin': 'Admin',
+  'admin.title': 'Utenti e accessi',
+  'admin.user': 'Utente',
+  'admin.roles': 'Ruoli',
+  'admin.save': 'Salva',
+  'admin.sso': 'Configura SSO',
+  'admin.flash.ok': 'Ruoli aggiornati.',
+  'admin.flash.conflict': 'Qualcuno ha modificato prima — ricarica e riprova.',
+  'admin.flash.notFound': 'Utente non trovato.',
+  'admin.flash.invalid': 'Ruoli non validi.',
+  'admin.flash.no_org': 'Nessuna organizzazione WorkOS configurata.',
+  'admin.flash.portal_error': 'Impossibile aprire il WorkOS Admin Portal.',
 }
 
 const DICTS: Record<Locale, Dict> = { en, it }

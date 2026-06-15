@@ -7,6 +7,7 @@ export type PolicyEntry =
 
 const PUBLIC: PolicyEntry = { kind: 'public' }
 const AUTHENTICATED: PolicyEntry = { kind: 'authenticated' }
+const roles = (...list: TenantRole[]): PolicyEntry => ({ kind: 'roles', roles: list })
 
 /**
  * The single source of truth for route → access. Every route MUST appear here;
@@ -22,6 +23,9 @@ export const RBAC_POLICY: Readonly<Record<string, PolicyEntry>> = {
   'GET /auth/callback': PUBLIC,
   'POST /auth/logout': AUTHENTICATED,
   'GET /dashboard': AUTHENTICATED,
+  'GET /admin/users': roles('ADMIN'),
+  'POST /admin/users/:id/roles': roles('ADMIN'),
+  'POST /admin/sso/portal': roles('ADMIN'),
 }
 
 export type RbacDecision = { kind: 'allow' } | { kind: 'login' } | { kind: 'forbidden' }

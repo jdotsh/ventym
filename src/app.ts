@@ -7,6 +7,7 @@ import { createRequestTiming } from '@/middleware/requestTiming'
 import { createSessionMiddleware } from '@/middleware/session'
 import { requireRoutePolicy } from '@/middleware/rbacEnforce'
 import { authRoutes } from '@/routes/auth'
+import { adminRoutes } from '@/routes/admin'
 import { viewRoutes } from '@/routes/views'
 import { healthRoutes } from '@/routes/health'
 import { logger, serializeError } from '@/utils/logger'
@@ -58,6 +59,7 @@ export function createApp(): Hono<AppEnv> {
   app.route('/', healthRoutes)
   app.route('/', authRoutes)
   app.route('/', viewRoutes)
+  app.route('/', adminRoutes)
 
   app.onError((err, c) => {
     logger.error('unhandled', { traceId: c.get('traceId'), ...serializeError(err) })

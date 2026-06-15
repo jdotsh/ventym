@@ -25,6 +25,8 @@ export type WorkosClient = {
   /** Validate (and transparently refresh) a sealed session cookie. */
   authenticateSession(sealedSession: string): Promise<WorkosIdentity | null>
   logoutUrl(sealedSession: string): Promise<string | null>
+  /** A self-serve WorkOS Admin Portal link for the tenant's IT to configure SSO/SCIM. */
+  adminPortalLink(organizationId: string, intent: 'sso' | 'dsync'): Promise<string>
 }
 
 type WorkosConfig = {
@@ -66,6 +68,11 @@ export function createWorkosClient(config: WorkosConfig): WorkosClient {
       const session = users.loadSealedSession({ sessionData: sealedSession, cookiePassword })
       const result = await session.authenticate()
       return result.authenticated ? session.getLogoutUrl() : null
+    },
+
+    async adminPortalLink(organizationId, intent) {
+      const { link } = await workos.adminPortal.generateLink({ organization: organizationId, intent })
+      return link
     },
   }
 }
