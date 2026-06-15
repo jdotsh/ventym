@@ -5,13 +5,13 @@ import type { TimesheetStatus } from '../../../db/schema'
 //                         │ reject(reason)
 //                         ▼
 //                      REJECTED ──revise──► DRAFT
-export const TIMESHEET_TRANSITIONS = ['submit', 'approve', 'reject', 'revise'] as const
+export const TIMESHEET_TRANSITIONS = ['submit', 'approve', 'reject', 'revise', 'book'] as const
 export type TimesheetTransition = (typeof TIMESHEET_TRANSITIONS)[number]
 
 const TRANSITIONS: Readonly<Record<TimesheetStatus, Partial<Record<TimesheetTransition, TimesheetStatus>>>> = {
   DRAFT: { submit: 'SUBMITTED' },
   SUBMITTED: { approve: 'APPROVED', reject: 'REJECTED' },
-  APPROVED: {}, // book → BOOKED lands in D4 (gated on wo.erp_link_status = LINKED)
+  APPROVED: { book: 'BOOKED' }, // gated on wo.erp_link_status = LINKED (the ERP service enforces it)
   REJECTED: { revise: 'DRAFT' },
   BOOKED: {},
 }

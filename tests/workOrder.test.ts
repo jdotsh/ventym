@@ -56,6 +56,7 @@ function fakeStore() {
         startDate: v.startDate,
         endDate: v.endDate,
         vendorId: null,
+        poCode: null,
         createdByUserId: v.createdByUserId,
         submittedAt: null,
         activatedAt: null,
@@ -99,6 +100,8 @@ function fakeStore() {
       wos.set(w.id, u)
       return u
     },
+    findErpStatusByLine: async () => null,
+    linkErp: async () => null,
     eventExists: async (_tx, _t, eventId) => events.has(eventId),
     appendEvent: async (_tx, e) => {
       if (events.has(e.eventId)) return false

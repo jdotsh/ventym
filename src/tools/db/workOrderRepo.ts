@@ -75,6 +75,46 @@ export function createWorkOrderRepo(db: Database) {
       return row ?? null
     },
 
+    // The ERP-link facts for the WO behind a line (the booking gate reads these).
+    async findErpStatusByLine(
+      tx: Database,
+      tenantId: string,
+      woLineId: string,
+    ): Promise<{ workOrderId: string; erpLinkStatus: string; currency: string; poCode: string | null } | null> {
+      const [row] = await tx
+        .select({
+          workOrderId: workOrder.id,
+          erpLinkStatus: workOrder.erpLinkStatus,
+          currency: workOrder.currency,
+          poCode: workOrder.poCode,
+        })
+        .from(workOrderLine)
+        .innerJoin(workOrder, eq(workOrderLine.workOrderId, workOrder.id))
+        .where(and(eq(workOrderLine.tenantId, tenantId), eq(workOrderLine.id, woLineId)))
+        .limit(1)
+      return row ?? null
+    },
+
+    // Link a PO: the ERP-link dimension UNLINKED → LINKED (only-once via the WHERE).
+    async linkErp(
+      tx: Database,
+      input: { id: string; tenantId: string; expectedVersion: number; poCode: string; now: Date },
+    ): Promise<WorkOrderRow | null> {
+      const [row] = await tx
+        .update(workOrder)
+        .set({ erpLinkStatus: 'LINKED', poCode: input.poCode, version: sql`${workOrder.version} + 1`, updatedAt: input.now })
+        .where(
+          and(
+            eq(workOrder.tenantId, input.tenantId),
+            eq(workOrder.id, input.id),
+            eq(workOrder.version, input.expectedVersion),
+            eq(workOrder.erpLinkStatus, 'UNLINKED'),
+          ),
+        )
+        .returning()
+      return row ?? null
+    },
+
     async eventExists(tx: Database, tenantId: string, eventId: string): Promise<boolean> {
       const [row] = await tx
         .select({ eventId: eventLog.eventId })

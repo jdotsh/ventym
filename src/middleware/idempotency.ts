@@ -2,6 +2,7 @@ import { createMiddleware } from 'hono/factory'
 import type { AppEnv } from '../../config/bindings'
 import { withTenantScope, type TenantScope } from '../../config/db'
 import { createIdempotencyRepo } from '@/tools/db/idempotencyRepo'
+import { sha256Hex } from '@/utils/hash'
 import { problemResponse } from '@/utils/problemResponse'
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
@@ -20,7 +21,7 @@ export function createIdempotency() {
     if (SAFE_METHODS.has(c.req.method) || !key || !session) return next()
 
     const body = await c.req.raw.clone().text()
-    const fingerprint = await sha256(`${c.req.method}:${c.req.path}:${body}`)
+    const fingerprint = await sha256Hex(`${c.req.method}:${c.req.path}:${body}`)
     const db = c.get('db')
     const scope: TenantScope = { tenantId: session.tenantId, userId: session.userId, sessionId: session.sessionId }
     const repo = createIdempotencyRepo(db)
@@ -55,9 +56,4 @@ export function createIdempotency() {
       repo.complete(tx, { tenantId: session.tenantId, key, statusCode: res.status, body: captured, contentType }),
     )
   })
-}
-
-async function sha256(input: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }

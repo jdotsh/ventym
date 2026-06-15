@@ -52,6 +52,8 @@ describe('handleMcpRequest', () => {
         'get_timesheet',
         'create_timesheet',
         'transition_timesheet',
+        'link_purchase_order',
+        'book_timesheet',
       ]),
     )
   })

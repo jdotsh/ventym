@@ -8,6 +8,8 @@ export const EVENT_TYPES = [
   'WORK_ORDER_VALIDATED',
   'TIMESHEET_SUBMITTED',
   'TIMESHEET_LINE_APPROVED',
+  'WORK_ORDER_PO_LINKED',
+  'TIMESHEET_BOOKED',
   'MILESTONE_ACCEPTED',
   'ERP_GOODS_RECEIPT_POSTED',
   // vendor-performance FEEDER events (never a stored score — computed downstream):

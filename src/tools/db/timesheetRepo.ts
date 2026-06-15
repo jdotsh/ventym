@@ -15,7 +15,10 @@ import {
 export type TimesheetRepo = ReturnType<typeof createTimesheetRepo>
 
 type TransitionFields = Partial<
-  Pick<TimesheetRow, 'submittedAt' | 'approvedAt' | 'rejectedAt' | 'approvedByUserId' | 'rejectionReason'>
+  Pick<
+    TimesheetRow,
+    'submittedAt' | 'approvedAt' | 'rejectedAt' | 'approvedByUserId' | 'rejectionReason' | 'bookedAt' | 'erpDocumentRef'
+  >
 >
 
 /** Timesheet data access. Every method runs inside a tenant-scoped tx; reads also

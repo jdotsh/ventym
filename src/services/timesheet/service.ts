@@ -115,6 +115,9 @@ function planTransition(
       return ok({ fields: { rejectionReason: reason, rejectedAt: now }, eventType: 'TIMESHEET_REJECTED' })
     case 'revise':
       return ok({ fields: {}, eventType: 'REWORK_LOOP_OPENED' })
+    case 'book':
+      // Booking goes through the ERP service (it needs the ERP-link gate + posting).
+      return err<TimesheetError>({ kind: 'invalid_transition', from: ts.status, transition: 'book' })
     default: {
       const unhandled: never = transition
       throw new Error(`unhandled timesheet transition: ${JSON.stringify(unhandled)}`)

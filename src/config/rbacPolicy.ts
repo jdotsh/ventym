@@ -40,6 +40,9 @@ export const RBAC_POLICY: Readonly<Record<string, PolicyEntry>> = {
   'POST /api/v1/timesheets/:id/reject': roles('ADMIN', 'MANAGER'),
   'POST /api/v1/timesheets/:id/revise': roles('ADMIN', 'MANAGER', 'MEMBER'),
   'GET /api/v1/timesheets/:id': AUTHENTICATED,
+  // ERP money loop — AP links the PO; the approved timesheet books to ERP.
+  'POST /api/v1/work-orders/:id/link-po': roles('ADMIN', 'MANAGER'),
+  'POST /api/v1/timesheets/:id/book': roles('ADMIN', 'MANAGER'),
   'GET /admin/users': roles('ADMIN'),
   'POST /admin/users/:id/roles': roles('ADMIN'),
   'POST /admin/sso/portal': roles('ADMIN'),

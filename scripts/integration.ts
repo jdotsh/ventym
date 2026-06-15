@@ -8,12 +8,14 @@
  */
 import { sql } from 'drizzle-orm'
 import { createDatabase, withTenantScope } from '../config/db'
-import { appUser, eventLog, idempotency, tenant, timesheet, workOrder } from '../db/schema'
+import { appUser, erpExport, eventLog, idempotency, tenant, timesheet, workOrder } from '../db/schema'
 import { createIdempotencyRepo } from '../src/tools/db/idempotencyRepo'
 import { buildWorkOrderDeps } from '../src/services/workOrder/deps'
 import { createWorkOrder, getWorkOrder, transitionWorkOrder } from '../src/services/workOrder/service'
 import { buildTimesheetDeps } from '../src/services/timesheet/deps'
 import { createTimesheet, transitionTimesheet } from '../src/services/timesheet/service'
+import { buildErpDeps } from '../src/services/erp/deps'
+import { bookTimesheet, linkPurchaseOrder } from '../src/services/erp/service'
 import type { SessionContext } from '../src/services/identity/service'
 
 const OWNER = process.env.OWNER ?? 'postgres://vms:vms@localhost:5433/vms'
@@ -155,8 +157,36 @@ async function main(): Promise<void> {
   const r4 = await claim(k2, 'fp-X')
   check('idempotency: uncompleted claim → in_progress', r4.kind === 'in_progress')
 
-  // Cleanup (FK order: events → timesheets → work orders [lines cascade] → idem → tenants → users).
+  // 7. Money loop: parked-approval gate → link PO → book to ERP.
+  const edeps = buildErpDeps(app, 'agent')
+  // The timesheet (tsId) is APPROVED at version 3; the WO is still ERP-UNLINKED.
+  const parked = await bookTimesheet(approver, { timesheetId: tsId, expectedVersion: 3, eventId: crypto.randomUUID() }, edeps)
+  check('money loop: book before PO link is parked (erp_not_linked)', !parked.ok && parked.error.kind === 'erp_not_linked')
+
+  const [woRow] = await owner.select({ v: workOrder.version }).from(workOrder).where(sql`${workOrder.id} = ${woId}`)
+  if (!woRow) throw new Error('wo row missing')
+  const link = await linkPurchaseOrder(ctx, { workOrderId: woId, poCode: 'PO-12345', expectedVersion: woRow.v, eventId: crypto.randomUUID() }, edeps)
+  check('money loop: link PO → ERP-link LINKED', link.ok && link.value.erpLinkStatus === 'LINKED' && link.value.poCode === 'PO-12345')
+
+  const bookEvt = crypto.randomUUID()
+  const book = await bookTimesheet(approver, { timesheetId: tsId, expectedVersion: 3, eventId: bookEvt }, edeps)
+  check('money loop: book APPROVED timesheet → BOOKED + erp_document_ref', book.ok && book.value.status === 'BOOKED' && book.value.erpDocumentRef !== null)
+
+  const [exp] = await owner.select().from(erpExport).where(sql`${erpExport.entityId} = ${tsId}`).limit(1)
+  check('money loop: erp_export recorded (CONFIRMED goods receipt)', exp !== undefined && exp.status === 'CONFIRMED')
+  const [grEv] = await owner
+    .select()
+    .from(eventLog)
+    .where(sql`${eventLog.eventType} = 'ERP_GOODS_RECEIPT_POSTED' AND ${eventLog.entityId} = ${tsId}`)
+    .limit(1)
+  check('money loop: ERP_GOODS_RECEIPT_POSTED event emitted (the money event)', grEv !== undefined)
+
+  const rebook = await bookTimesheet(approver, { timesheetId: tsId, expectedVersion: 3, eventId: bookEvt }, edeps)
+  check('money loop: re-book with same event_id is a no-op (still BOOKED)', rebook.ok && rebook.value.status === 'BOOKED')
+
+  // Cleanup (FK order: events → exports → timesheets → work orders [lines cascade] → idem → tenants → users).
   await owner.delete(idempotency).where(sql`${idempotency.tenantId} IN (${t1.id}, ${t2.id})`)
+  await owner.delete(erpExport).where(sql`${erpExport.tenantId} IN (${t1.id}, ${t2.id})`)
   await owner.delete(eventLog).where(sql`${eventLog.tenantId} IN (${t1.id}, ${t2.id})`)
   await owner.delete(timesheet).where(sql`${timesheet.tenantId} IN (${t1.id}, ${t2.id})`)
   await owner.delete(workOrder).where(sql`${workOrder.tenantId} IN (${t1.id}, ${t2.id})`)

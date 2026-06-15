@@ -13,6 +13,8 @@ import { buildTimesheetDeps } from '@/services/timesheet/deps'
 import { createTimesheet, getTimesheet, transitionTimesheet } from '@/services/timesheet/service'
 import { createTimesheetSchema } from '@/services/timesheet/schema'
 import { TIMESHEET_TRANSITIONS } from '@/services/timesheet/machine'
+import { buildErpDeps } from '@/services/erp/deps'
+import { bookTimesheet, linkPurchaseOrder } from '@/services/erp/service'
 
 // Minimal MCP over JSON-RPC 2.0 (Streamable HTTP). Stateless: one request → one
 // response. Covers initialize / tools.list / tools.call — enough for a governed
@@ -199,6 +201,46 @@ const TOOLS: readonly McpTool[] = [
           ...(a.reason ? { reason: a.reason } : {}),
         },
         buildTimesheetDeps(deps.db, 'agent'),
+      )
+      return result.ok ? result.value : { error: result.error.kind }
+    },
+  },
+  {
+    name: 'link_purchase_order',
+    description: 'Link a PO to a work order (ERP-link UNLINKED→LINKED). Requires MANAGER.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' }, poCode: { type: 'string' }, expectedVersion: { type: 'integer' }, idempotencyKey: { type: 'string' } },
+      required: ['id', 'poCode', 'expectedVersion'],
+    },
+    requiredRole: 'MANAGER',
+    scope: 'write',
+    run: async (ctx, deps, args) => {
+      const a = z.object({ id: z.string().uuid(), poCode: z.string().min(1).max(100), expectedVersion: z.number().int().min(1), idempotencyKey: z.string().optional() }).parse(args)
+      const result = await linkPurchaseOrder(
+        ctx,
+        { workOrderId: a.id, poCode: a.poCode, expectedVersion: a.expectedVersion, eventId: a.idempotencyKey ?? crypto.randomUUID() },
+        buildErpDeps(deps.db, 'agent'),
+      )
+      return result.ok ? result.value : { error: result.error.kind }
+    },
+  },
+  {
+    name: 'book_timesheet',
+    description: 'Book an APPROVED timesheet to ERP (gated on the WO being LINKED). Requires MANAGER.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' }, expectedVersion: { type: 'integer' }, idempotencyKey: { type: 'string' } },
+      required: ['id', 'expectedVersion'],
+    },
+    requiredRole: 'MANAGER',
+    scope: 'write',
+    run: async (ctx, deps, args) => {
+      const a = z.object({ id: z.string().uuid(), expectedVersion: z.number().int().min(1), idempotencyKey: z.string().optional() }).parse(args)
+      const result = await bookTimesheet(
+        ctx,
+        { timesheetId: a.id, expectedVersion: a.expectedVersion, eventId: a.idempotencyKey ?? crypto.randomUUID() },
+        buildErpDeps(deps.db, 'agent'),
       )
       return result.ok ? result.value : { error: result.error.kind }
     },

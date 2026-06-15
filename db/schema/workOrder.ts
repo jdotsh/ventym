@@ -63,6 +63,7 @@ export const workOrder = pgTable(
     startDate: date('start_date').notNull(),
     endDate: date('end_date').notNull(),
     vendorId: uuid('vendor_id'), // D5 — counterparty link
+    poCode: varchar('po_code', { length: 100 }), // the customer ERP PO ref (set at link_po)
     createdByUserId: uuid('created_by_user_id')
       .notNull()
       .references(() => appUser.id),

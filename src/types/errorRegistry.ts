@@ -80,6 +80,9 @@ export const DOMAIN_REGISTRY = {
   TS_VERSION_CONFLICT: { grpc: 'ABORTED', description: 'Optimistic-lock version mismatch; reload and retry' },
   SOD_VIOLATION: { grpc: 'PERMISSION_DENIED', description: 'Separation of duties: the approver cannot be the submitter' },
   REASON_REQUIRED: { grpc: 'INVALID_ARGUMENT', description: 'A reason is required for this action' },
+  // ERP money loop
+  WO_ERP_ALREADY_LINKED: { grpc: 'ALREADY_EXISTS', description: 'Work order is already linked to a PO' },
+  ERP_NOT_LINKED: { grpc: 'FAILED_PRECONDITION', description: "Work order has no PO linked — the approval is parked until AP links it" },
   // Auth / authz
   UNAUTHORIZED: { grpc: 'UNAUTHENTICATED', description: 'Session missing or invalid' },
   FORBIDDEN: { grpc: 'PERMISSION_DENIED', description: 'Authenticated but not authorised for this action' },
