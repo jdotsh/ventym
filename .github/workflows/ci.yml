@@ -2,11 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
 
 jobs:
-  ci:
+  # Fast gates: typecheck, lint, RBAC coverage, secret scan, unit tests.
+  unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,3 +18,35 @@ jobs:
       - run: bun run gate:rbac # every route is governed by RBAC_POLICY
       - run: bun run gate:secrets # no committed credentials
       - run: bun run test
+
+  # Integration: the dual-surface write path against a REAL Postgres as the
+  # non-owner vms_app role — outbox, RLS isolation, immutability, agent
+  # attribution, and the timesheet value loop with maker-checker SoD.
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vms
+          POSTGRES_PASSWORD: vms
+          POSTGRES_DB: vms
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vms" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      # Migrations run as the OWNER (vms); the integration connects as the
+      # non-owner vms_app role (created by migration 0000) so RLS is enforced.
+      DATABASE_URL: postgres://vms:vms@localhost:5432/vms
+      OWNER: postgres://vms:vms@localhost:5432/vms
+      APP: postgres://vms_app:vms_app@localhost:5432/vms
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Apply migrations (as owner)
+        run: bun run db:migrate
+      - name: Integration suite (as vms_app)
+        run: bun run test:integration

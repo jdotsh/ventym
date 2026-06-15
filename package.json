@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
+    "test:integration": "bun scripts/integration.ts",
     "gate:rbac": "tsx scripts/check-rbac-coverage.ts",
     "gate:secrets": "bash scripts/secret-scan.sh",
     "ci": "bun run typecheck && bun run lint && bun run gate:rbac && bun run gate:secrets && bun run test",

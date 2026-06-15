@@ -1,8 +1,10 @@
 /**
- * Live integration smoke (needs Docker Postgres on :5433). Proves the dual-surface
- * write path end-to-end against the DB as the NON-OWNER vms_app role: the outbox,
- * idempotent replay, RLS isolation, and event-log immutability.
- *   OWNER='postgres://vms:vms@localhost:5433/vms' bun scripts/smoke-wo.ts
+ * Integration suite (needs a real Postgres — Docker local on :5433, or the CI
+ * service). Proves the dual-surface write path end-to-end against the DB as the
+ * NON-OWNER vms_app role: the transactional outbox, idempotent replay, RLS
+ * isolation, event-log immutability, agent attribution, and the timesheet value
+ * loop with maker-checker SoD. Run: `bun run test:integration` (exits non-zero
+ * on any failure). Override OWNER/APP env to point at a different Postgres.
  */
 import { sql } from 'drizzle-orm'
 import { createDatabase, withTenantScope } from '../config/db'
