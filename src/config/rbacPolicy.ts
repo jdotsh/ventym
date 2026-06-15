@@ -13,6 +13,9 @@ const AUTHENTICATED: PolicyEntry = { kind: 'authenticated' }
  * an absent route is DENIED (fail-closed). Keyed by `METHOD /route-pattern`.
  */
 export const RBAC_POLICY: Readonly<Record<string, PolicyEntry>> = {
+  'GET /': PUBLIC,
+  'GET /login': PUBLIC,
+  'GET /assets/app.css': PUBLIC,
   'GET /health': PUBLIC,
   'GET /health/ready': PUBLIC,
   'GET /auth/login': PUBLIC,

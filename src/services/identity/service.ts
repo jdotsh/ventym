@@ -6,6 +6,8 @@ import type { WorkosIdentity } from '@/tools/workos/client'
 /** The authenticated principal for a request — identity + authorization facets. */
 export type SessionContext = {
   userId: string
+  email: string
+  displayName: string | null
   tenantId: string
   sessionId: string
   roles: TenantRole[]
@@ -49,7 +51,15 @@ export async function resolveLoginContext(
     return member.roles
   })
 
-  return { userId: user.id, tenantId, sessionId: identity.sessionId, roles, activeRole: pickActiveRole(roles) }
+  return {
+    userId: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    tenantId,
+    sessionId: identity.sessionId,
+    roles,
+    activeRole: pickActiveRole(roles),
+  }
 }
 
 /** Per-request path: load context read-only (roles re-checked every request). */
@@ -69,6 +79,8 @@ export async function loadSessionContext(
 
   return {
     userId: user.id,
+    email: user.email,
+    displayName: user.displayName,
     tenantId,
     sessionId: identity.sessionId,
     roles: member.roles,
