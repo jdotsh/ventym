@@ -1,5 +1,6 @@
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { Hono } from 'hono'
+import type { Context } from 'hono'
 import type { CookieOptions } from 'hono/utils/cookie'
 import type { AppEnv } from '../../config/bindings'
 import { SESSION_COOKIE } from '@/middleware/session'
@@ -19,14 +20,18 @@ const cookie = (secure: boolean, maxAge: number): CookieOptions => ({
   maxAge,
 })
 
+// Start AuthKit (password, MFA, SSO at the WorkOS hosted page). `screenHint`
+// opens sign-in vs sign-up. A signed `state` cookie protects the round-trip.
+function startAuth(c: Context<AppEnv>, screenHint?: 'sign-in' | 'sign-up'): Response {
+  const secure = c.get('config').ENVIRONMENT !== 'local'
+  const state = randomId()
+  setCookie(c, STATE_COOKIE, state, cookie(secure, 600))
+  return c.redirect(c.get('workos').authorizationUrl(state, screenHint))
+}
+
 export const authRoutes = new Hono<AppEnv>()
-  // Start AuthKit (handles password, MFA, and SSO at the WorkOS hosted page).
-  .get('/auth/login', (c) => {
-    const secure = c.get('config').ENVIRONMENT !== 'local'
-    const state = randomId()
-    setCookie(c, STATE_COOKIE, state, cookie(secure, 600))
-    return c.redirect(c.get('workos').authorizationUrl(state))
-  })
+  .get('/auth/login', (c) => startAuth(c, 'sign-in'))
+  .get('/auth/signup', (c) => startAuth(c, 'sign-up'))
 
   // Exchange the code, JIT the user + membership, set the sealed session.
   .get('/auth/callback', async (c) => {

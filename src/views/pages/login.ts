@@ -15,6 +15,9 @@ export function loginPage(props: { locale: Locale; error?: string }): Html {
         <h1>${t(locale, 'login.title')}</h1>
         ${props.error ? html`<p class="alert alert--danger">${t(locale, errorKey(props.error))}</p>` : ''}
         <a class="btn btn--primary btn--lg btn--block" href="/auth/login">${t(locale, 'login.cta')}</a>
+        <p class="small">
+          ${t(locale, 'login.signupPrompt')} <a href="/auth/signup">${t(locale, 'login.signupCta')}</a>
+        </p>
         <p class="muted small">${t(locale, 'login.note')}</p>
       </div>
     </main>`,

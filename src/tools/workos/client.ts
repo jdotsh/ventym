@@ -19,7 +19,8 @@ export type WorkosIdentity = {
  * lives only here, so swapping the broker (or faking it in tests) is one file.
  */
 export type WorkosClient = {
-  authorizationUrl(state: string): string
+  /** AuthKit hosted entry. `screenHint` opens the sign-in or sign-up screen. */
+  authorizationUrl(state: string, screenHint?: 'sign-in' | 'sign-up'): string
   /** Exchange the callback code → identity + the sealed session cookie value. */
   completeLogin(code: string): Promise<{ identity: WorkosIdentity; sealedSession: string }>
   /** Validate (and transparently refresh) a sealed session cookie. */
@@ -48,8 +49,14 @@ export function createWorkosClient(config: WorkosConfig): WorkosClient {
   const users = workos.userManagement
 
   return {
-    authorizationUrl(state) {
-      return users.getAuthorizationUrl({ provider: 'authkit', clientId, redirectUri, state })
+    authorizationUrl(state, screenHint) {
+      return users.getAuthorizationUrl({
+        provider: 'authkit',
+        clientId,
+        redirectUri,
+        state,
+        ...(screenHint ? { screenHint } : {}),
+      })
     },
 
     async completeLogin(code) {
