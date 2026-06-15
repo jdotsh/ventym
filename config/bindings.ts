@@ -1,6 +1,7 @@
 import type { AppConfig } from './env'
 import type { Database } from './db'
 import type { WorkosClient } from '@/tools/workos/client'
+import type { AgentVerifier } from '@/tools/workos/agentAuth'
 import type { SessionContext } from '@/services/identity/service'
 
 /** Raw Cloudflare Worker env: vars + secrets + bindings. */
@@ -21,6 +22,7 @@ export type AppVariables = {
   config: AppConfig
   db: Database
   workos: WorkosClient
+  agentVerifier: AgentVerifier
   session: SessionContext | null // null = anonymous
 }
 

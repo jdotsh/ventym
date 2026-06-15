@@ -3,12 +3,14 @@ import { parseConfig, type AppConfig } from '../config/env'
 import { createDatabase, type Database } from '../config/db'
 import type { AppEnv, WorkerEnv } from '../config/bindings'
 import { createWorkosClient, type WorkosClient } from '@/tools/workos/client'
+import { createAgentVerifier, type AgentVerifier } from '@/tools/workos/agentAuth'
 import { createRequestTiming } from '@/middleware/requestTiming'
 import { createSessionMiddleware } from '@/middleware/session'
 import { requireRoutePolicy } from '@/middleware/rbacEnforce'
 import { authRoutes } from '@/routes/auth'
 import { adminRoutes } from '@/routes/admin'
 import { webhookRoutes } from '@/routes/webhooks'
+import { agentRoutes } from '@/routes/agent'
 import { viewRoutes } from '@/routes/views'
 import { healthRoutes } from '@/routes/health'
 import { logger, serializeError } from '@/utils/logger'
@@ -18,6 +20,7 @@ import { randomId } from '@/utils/ids'
 let cachedConfig: AppConfig | undefined
 let cachedDb: Database | undefined
 let cachedWorkos: WorkosClient | undefined
+let cachedAgentVerifier: AgentVerifier | undefined
 
 const resolveConfig = (env: WorkerEnv): AppConfig => (cachedConfig ??= parseConfig(env))
 
@@ -28,6 +31,12 @@ const resolveWorkos = (config: AppConfig): WorkosClient =>
     redirectUri: config.WORKOS_REDIRECT_URI,
     cookiePassword: config.SESSION_SECRET,
     webhookSecret: config.WORKOS_WEBHOOK_SECRET,
+  }))
+
+const resolveAgentVerifier = (config: AppConfig): AgentVerifier =>
+  (cachedAgentVerifier ??= createAgentVerifier({
+    authkitDomain: config.WORKOS_AUTHKIT_DOMAIN,
+    audience: config.WORKOS_CLIENT_ID,
   }))
 
 function resolveDb(env: WorkerEnv, config: AppConfig): Database {
@@ -52,6 +61,7 @@ export function createApp(): Hono<AppEnv> {
     c.set('config', config)
     c.set('db', resolveDb(c.env, config))
     c.set('workos', resolveWorkos(config))
+    c.set('agentVerifier', resolveAgentVerifier(config))
     await next()
   })
   app.use('*', createRequestTiming())
@@ -61,6 +71,7 @@ export function createApp(): Hono<AppEnv> {
   app.route('/', healthRoutes)
   app.route('/', authRoutes)
   app.route('/', webhookRoutes)
+  app.route('/', agentRoutes)
   app.route('/', viewRoutes)
   app.route('/', adminRoutes)
 

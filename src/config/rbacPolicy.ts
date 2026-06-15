@@ -22,6 +22,8 @@ export const RBAC_POLICY: Readonly<Record<string, PolicyEntry>> = {
   'GET /auth/login': PUBLIC,
   'GET /auth/callback': PUBLIC,
   'POST /webhooks/workos': PUBLIC, // machine surface — auth is the signature
+  'GET /.well-known/oauth-protected-resource': PUBLIC,
+  'GET /agent/whoami': PUBLIC, // machine surface — auth is the bearer token
   'POST /auth/logout': AUTHENTICATED,
   'GET /dashboard': AUTHENTICATED,
   'GET /admin/users': roles('ADMIN'),

@@ -18,6 +18,7 @@
     "@workos-inc/node": "10.2.0",
     "drizzle-orm": "0.36.4",
     "hono": "4.6.14",
+    "jose": "5.9.6",
     "postgres": "3.4.5",
     "zod": "3.23.8"
   },

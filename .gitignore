@@ -6,5 +6,4 @@ dist/
 .DS_Store
 
 # Local reference repos (study only — never part of the build)
-worker-main/
-go-example-applications-main/
+*-main/

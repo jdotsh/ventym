@@ -5,3 +5,4 @@ WORKOS_CLIENT_ID=client_xxx
 WORKOS_REDIRECT_URI=http://localhost:8787/auth/callback
 SESSION_SECRET=replace-with-32+-byte-random-string
 WORKOS_WEBHOOK_SECRET=wh_secret_from_dashboard
+WORKOS_AUTHKIT_DOMAIN=https://your-app.authkit.app
