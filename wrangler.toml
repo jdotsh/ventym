@@ -15,5 +15,10 @@ localConnectionString = "postgres://vms_app:vms_app@localhost:5433/vms"
 binding = "SLI"
 dataset = "vms_sli"
 
+# Rate-limit counters (machine surfaces). Miniflare simulates this locally.
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "rate_limit_kv_placeholder"
+
 [vars]
 ENVIRONMENT = "local"

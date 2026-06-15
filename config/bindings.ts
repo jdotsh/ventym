@@ -14,6 +14,7 @@ export type WorkerEnv = {
   SESSION_SECRET: string
   HYPERDRIVE?: Hyperdrive
   SLI?: AnalyticsEngineDataset
+  RATE_LIMIT?: KVNamespace
 }
 
 /** Per-request context the middleware chain populates. */

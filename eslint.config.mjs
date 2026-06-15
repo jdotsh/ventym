@@ -16,7 +16,10 @@ export default tseslint.config(
       'no-console': 'error',
     },
   },
-  { files: ['src/utils/logger.ts', 'db/seed.ts', 'drizzle.config.ts'], rules: { 'no-console': 'off' } },
+  {
+    files: ['src/utils/logger.ts', 'db/seed.ts', 'drizzle.config.ts', 'scripts/**/*.ts'],
+    rules: { 'no-console': 'off' },
+  },
   // `*-main/` = local reference repos (study only); fence them all from the build.
   { ignores: ['dist/', '.wrangler/', 'node_modules/', '**/*-main/'] },
 )

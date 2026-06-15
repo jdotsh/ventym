@@ -5,6 +5,8 @@ import type { AppEnv, WorkerEnv } from '../config/bindings'
 import { createWorkosClient, type WorkosClient } from '@/tools/workos/client'
 import { createAgentVerifier, type AgentVerifier } from '@/tools/workos/agentAuth'
 import { createRequestTiming } from '@/middleware/requestTiming'
+import { createSecurityHeaders } from '@/middleware/security'
+import { createRateLimit } from '@/middleware/rateLimit'
 import { createSessionMiddleware } from '@/middleware/session'
 import { requireRoutePolicy } from '@/middleware/rbacEnforce'
 import { authRoutes } from '@/routes/auth'
@@ -65,7 +67,12 @@ export function createApp(): Hono<AppEnv> {
     c.set('agentVerifier', resolveAgentVerifier(config))
     await next()
   })
+  app.use('*', createSecurityHeaders())
   app.use('*', createRequestTiming())
+  // Throttle the unauthenticated/machine surfaces (auth is the token/signature).
+  app.use('/mcp', createRateLimit({ name: 'mcp', limit: 120, windowSec: 60 }))
+  app.use('/webhooks/*', createRateLimit({ name: 'webhook', limit: 240, windowSec: 60 }))
+  app.use('/agent/*', createRateLimit({ name: 'agent', limit: 120, windowSec: 60 }))
   app.use('*', createSessionMiddleware())
   app.use('*', requireRoutePolicy())
 
