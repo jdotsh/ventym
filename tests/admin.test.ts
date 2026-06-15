@@ -22,6 +22,7 @@ const workos: AdminDeps['workos'] = {
   authenticateSession: async () => null,
   logoutUrl: async () => null,
   adminPortalLink: async () => 'https://portal',
+  verifyWebhook: async () => null,
 }
 
 function deps(repo: Partial<AdminDeps['repo']>, audit: { calls: number }): AdminDeps {

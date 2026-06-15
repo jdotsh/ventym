@@ -7,6 +7,7 @@ const configSchema = z.object({
   WORKOS_API_KEY: z.string().startsWith('sk_'),
   WORKOS_CLIENT_ID: z.string().min(1),
   WORKOS_REDIRECT_URI: z.string().url(),
+  WORKOS_WEBHOOK_SECRET: z.string().or(z.literal('')).default(''), // Directory Sync events
   SESSION_SECRET: z.string().min(32),
 })
 

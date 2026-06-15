@@ -8,6 +8,7 @@ import { createSessionMiddleware } from '@/middleware/session'
 import { requireRoutePolicy } from '@/middleware/rbacEnforce'
 import { authRoutes } from '@/routes/auth'
 import { adminRoutes } from '@/routes/admin'
+import { webhookRoutes } from '@/routes/webhooks'
 import { viewRoutes } from '@/routes/views'
 import { healthRoutes } from '@/routes/health'
 import { logger, serializeError } from '@/utils/logger'
@@ -26,6 +27,7 @@ const resolveWorkos = (config: AppConfig): WorkosClient =>
     clientId: config.WORKOS_CLIENT_ID,
     redirectUri: config.WORKOS_REDIRECT_URI,
     cookiePassword: config.SESSION_SECRET,
+    webhookSecret: config.WORKOS_WEBHOOK_SECRET,
   }))
 
 function resolveDb(env: WorkerEnv, config: AppConfig): Database {
@@ -58,6 +60,7 @@ export function createApp(): Hono<AppEnv> {
 
   app.route('/', healthRoutes)
   app.route('/', authRoutes)
+  app.route('/', webhookRoutes)
   app.route('/', viewRoutes)
   app.route('/', adminRoutes)
 

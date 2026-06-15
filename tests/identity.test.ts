@@ -51,9 +51,13 @@ function deps(repo: Partial<IdentityDeps['repo']>): IdentityDeps {
   const base: IdentityDeps['repo'] = {
     resolveDefaultTenantId: async () => 't_1',
     findUserByWorkosId: async () => user(),
+    findUserByEmail: async () => user(),
     upsertUserByWorkos: async () => user(),
+    ensureUserByEmail: async () => user(),
     findActiveMembership: async () => member(),
     createMembership: async () => member(),
+    suspendMemberships: async () => 0,
+    writeAudit: async () => {},
   }
   return {
     repo: { ...base, ...repo },

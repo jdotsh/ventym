@@ -1,6 +1,6 @@
 import { and, desc, eq, or } from 'drizzle-orm'
 import type { Database } from '../../../config/db'
-import { appUser, membership, tenant, type TenantRole } from '../../../db/schema'
+import { appUser, auditLog, membership, tenant, type ActorKind, type TenantRole } from '../../../db/schema'
 
 export type AppUserRow = typeof appUser.$inferSelect
 export type MembershipRow = typeof membership.$inferSelect
@@ -28,6 +28,22 @@ export function createIdentityRepo(db: Database) {
     async findUserByWorkosId(workosUserId: string): Promise<AppUserRow | null> {
       const [row] = await db.select().from(appUser).where(eq(appUser.workosUserId, workosUserId)).limit(1)
       return row ?? null
+    },
+
+    async findUserByEmail(email: string): Promise<AppUserRow | null> {
+      const [row] = await db.select().from(appUser).where(eq(appUser.email, email.toLowerCase())).limit(1)
+      return row ?? null
+    },
+
+    // Deprovision (leaver): suspend the user's membership in the scoped tenant.
+    // Idempotent — returns how many active memberships it just deactivated.
+    async suspendMemberships(tx: Database, appUserId: string): Promise<number> {
+      const rows = await tx
+        .update(membership)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(and(eq(membership.appUserId, appUserId), eq(membership.isActive, true)))
+        .returning({ id: membership.id })
+      return rows.length
     },
 
     // JIT: link the WorkOS user to an app_user (by workosUserId, else email).
@@ -75,6 +91,31 @@ export function createIdentityRepo(db: Database) {
       const [row] = await tx.insert(membership).values(input).returning()
       if (!row) throw new Error('failed to create membership')
       return row
+    },
+
+    // Provision (joiner) link is by EMAIL — never touches the AuthKit workosUserId,
+    // which the login path owns.
+    async ensureUserByEmail(input: { email: string; displayName: string | null }): Promise<AppUserRow> {
+      const email = input.email.toLowerCase()
+      const [existing] = await db.select().from(appUser).where(eq(appUser.email, email)).limit(1)
+      if (existing) return existing
+      const [created] = await db.insert(appUser).values({ email, displayName: input.displayName }).returning()
+      if (!created) throw new Error('failed to create app_user')
+      return created
+    },
+
+    async writeAudit(
+      tx: Database,
+      entry: { tenantId: string; action: string; entityId: string; actorKind: ActorKind; after?: unknown },
+    ): Promise<void> {
+      await tx.insert(auditLog).values({
+        tenantId: entry.tenantId,
+        entityType: 'membership',
+        entityId: entry.entityId,
+        action: entry.action,
+        actorKind: entry.actorKind,
+        afterJson: entry.after ?? null,
+      })
     },
   }
 }

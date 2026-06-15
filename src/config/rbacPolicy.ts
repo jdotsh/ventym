@@ -21,6 +21,7 @@ export const RBAC_POLICY: Readonly<Record<string, PolicyEntry>> = {
   'GET /health/ready': PUBLIC,
   'GET /auth/login': PUBLIC,
   'GET /auth/callback': PUBLIC,
+  'POST /webhooks/workos': PUBLIC, // machine surface — auth is the signature
   'POST /auth/logout': AUTHENTICATED,
   'GET /dashboard': AUTHENTICATED,
   'GET /admin/users': roles('ADMIN'),

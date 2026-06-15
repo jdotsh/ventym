@@ -27,18 +27,24 @@ export type WorkosClient = {
   logoutUrl(sealedSession: string): Promise<string | null>
   /** A self-serve WorkOS Admin Portal link for the tenant's IT to configure SSO/SCIM. */
   adminPortalLink(organizationId: string, intent: 'sso' | 'dsync'): Promise<string>
+  /** Verify a Directory Sync webhook by its signature. Null = invalid/forged. */
+  verifyWebhook(rawBody: string, signatureHeader: string): Promise<WebhookEvent | null>
 }
+
+/** A signature-verified webhook event. `data` is untrusted until the handler parses it. */
+export type WebhookEvent = { type: string; data: unknown }
 
 type WorkosConfig = {
   apiKey: string
   clientId: string
   redirectUri: string
   cookiePassword: string
+  webhookSecret: string
 }
 
 export function createWorkosClient(config: WorkosConfig): WorkosClient {
   const workos = new WorkOS(config.apiKey)
-  const { clientId, redirectUri, cookiePassword } = config
+  const { clientId, redirectUri, cookiePassword, webhookSecret } = config
   const users = workos.userManagement
 
   return {
@@ -73,6 +79,20 @@ export function createWorkosClient(config: WorkosConfig): WorkosClient {
     async adminPortalLink(organizationId, intent) {
       const { link } = await workos.adminPortal.generateLink({ organization: organizationId, intent })
       return link
+    },
+
+    async verifyWebhook(rawBody, signatureHeader) {
+      try {
+        // Verifies HMAC over `${timestamp}.${rawBody}`; throws on mismatch/expiry.
+        const event = await workos.webhooks.constructEvent({
+          payload: rawBody,
+          sigHeader: signatureHeader,
+          secret: webhookSecret,
+        })
+        return { type: event.event, data: event.data }
+      } catch {
+        return null
+      }
     },
   }
 }
