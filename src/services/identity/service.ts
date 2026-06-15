@@ -12,6 +12,9 @@ export type SessionContext = {
   sessionId: string
   roles: TenantRole[]
   activeRole: TenantRole | null
+  // Per-token OAuth scopes (agent path only). Undefined for humans / unscoped
+  // tokens = full delegation; a present, non-empty list narrows what the agent may do.
+  tokenScopes?: readonly string[]
 }
 
 export type IdentityDeps = {

@@ -9,6 +9,7 @@ import { createRequestTiming } from '@/middleware/requestTiming'
 import { createSecurityHeaders } from '@/middleware/security'
 import { createRateLimit } from '@/middleware/rateLimit'
 import { createSessionMiddleware } from '@/middleware/session'
+import { createCsrf } from '@/middleware/csrf'
 import { requireRoutePolicy } from '@/middleware/rbacEnforce'
 import { authRoutes } from '@/routes/auth'
 import { adminRoutes } from '@/routes/admin'
@@ -77,7 +78,9 @@ export function createApp(): Hono<AppEnv> {
   app.use('/mcp', createRateLimit({ name: 'mcp', limit: 120, windowSec: 60 }))
   app.use('/webhooks/*', createRateLimit({ name: 'webhook', limit: 240, windowSec: 60 }))
   app.use('/agent/*', createRateLimit({ name: 'agent', limit: 120, windowSec: 60 }))
+  app.use('/api/*', createRateLimit({ name: 'api', limit: 300, windowSec: 60 }))
   app.use('*', createSessionMiddleware())
+  app.use('*', createCsrf()) // after session: CSRF applies only to cookie-authed mutations
   app.use('*', requireRoutePolicy())
 
   app.route('/', healthRoutes)

@@ -19,7 +19,7 @@ export async function authenticateAgent(c: Context<AppEnv>): Promise<SessionCont
   const principal = await c.get('agentVerifier').verify(token)
   if (!principal) return null
 
-  return loadSessionContext(
+  const session = await loadSessionContext(
     {
       workosUserId: principal.workosUserId,
       sessionId: principal.sessionId,
@@ -31,6 +31,8 @@ export async function authenticateAgent(c: Context<AppEnv>): Promise<SessionCont
     },
     buildIdentityDeps(c.get('db')),
   )
+  // Carry the token's OAuth scopes so the MCP layer can enforce least-privilege.
+  return session ? { ...session, tokenScopes: principal.scopes } : null
 }
 
 /** RFC 9728 challenge: tells the agent where to discover the auth server. */

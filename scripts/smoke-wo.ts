@@ -63,6 +63,8 @@ async function main(): Promise<void> {
   check('outbox: 2 line-committed events appended in the same tx', (await evCount()) === 2)
   const [agentEv] = await owner.select().from(eventLog).where(sql`${eventLog.actorKind} = 'agent'`).limit(1)
   check('events attributed to actor_kind=agent', agentEv !== undefined)
+  const [sessEv] = await owner.select().from(eventLog).where(sql`${eventLog.actorSessionId} = ${ctx.sessionId}`).limit(1)
+  check('events carry actor_session_id (which agent/token acted)', sessEv !== undefined)
 
   // 2. Transition + idempotent replay (event_id is a UUID, as REST/MCP pass).
   const evtId = crypto.randomUUID()

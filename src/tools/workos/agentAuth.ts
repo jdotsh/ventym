@@ -10,6 +10,14 @@ export type AgentPrincipal = {
   workosUserId: string // JWT `sub` — the user who authorized the agent
   sessionId: string // JWT `sid`
   organizationId: string | null // JWT `org_id`
+  scopes: string[] // JWT `scope`/`scp` — per-token least-privilege (empty = full delegation)
+}
+
+function extractScopes(payload: Record<string, unknown>): string[] {
+  const raw = payload.scope ?? payload.scp
+  if (typeof raw === 'string') return raw.split(/\s+/).filter(Boolean)
+  if (Array.isArray(raw)) return raw.filter((s): s is string => typeof s === 'string')
+  return []
 }
 
 export type AgentVerifier = {
@@ -42,6 +50,7 @@ export function createAgentVerifier(config: {
           workosUserId: payload.sub,
           sessionId: payload.sid,
           organizationId: typeof payload.org_id === 'string' ? payload.org_id : null,
+          scopes: extractScopes(payload),
         }
       } catch {
         return null

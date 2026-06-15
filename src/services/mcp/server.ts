@@ -35,8 +35,17 @@ type McpTool = {
   name: string
   description: string
   inputSchema: object
-  requiredRole?: TenantRole
+  requiredRole?: TenantRole // role the agent must hold (feed-only RBAC)
+  scope?: 'read' | 'write' // OAuth capability the token must grant (least-privilege)
   run(ctx: SessionContext, deps: McpDeps, args: unknown): Promise<unknown>
+}
+
+// A scoped token narrows what its agent may do; an unscoped token (no `scope`
+// claim) is full delegation. 'write' implies 'read'.
+function scopeGrants(tokenScopes: readonly string[] | undefined, need: 'read' | 'write'): boolean {
+  if (!tokenScopes || tokenScopes.length === 0) return true
+  const has = (cap: string) => tokenScopes.some((s) => s === cap || s === `vms:${cap}` || s.endsWith(`:${cap}`))
+  return need === 'read' ? has('read') || has('write') : has('write')
 }
 
 const NO_ARGS = { type: 'object', properties: {} } as const
@@ -66,6 +75,7 @@ const TOOLS: readonly McpTool[] = [
     description: 'List the members of the tenant and their roles. Requires ADMIN.',
     inputSchema: NO_ARGS,
     requiredRole: 'ADMIN',
+    scope: 'read',
     run: async (ctx, deps) => {
       const members = await listMembers(
         { tenantId: ctx.tenantId, userId: ctx.userId, sessionId: ctx.sessionId },
@@ -78,6 +88,7 @@ const TOOLS: readonly McpTool[] = [
     name: 'get_work_order',
     description: 'Fetch a work order by id (tenant-scoped).',
     inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+    scope: 'read',
     run: async (ctx, deps, args) => {
       const { id } = z.object({ id: z.string().uuid() }).parse(args)
       const wo = await getWorkOrder(ctx, id, buildWorkOrderDeps(deps.db, 'agent'))
@@ -89,6 +100,7 @@ const TOOLS: readonly McpTool[] = [
     description: 'Create a draft work order with lines. Requires MANAGER.',
     inputSchema: { type: 'object', properties: { code: { type: 'string' }, lines: { type: 'array' } }, required: ['code', 'lines'] },
     requiredRole: 'MANAGER',
+    scope: 'write',
     run: async (ctx, deps, args) => {
       const input = createWorkOrderSchema.parse(args)
       const result = await createWorkOrder(ctx, input, buildWorkOrderDeps(deps.db, 'agent'))
@@ -109,6 +121,7 @@ const TOOLS: readonly McpTool[] = [
       required: ['id', 'transition', 'expectedVersion'],
     },
     requiredRole: 'MANAGER',
+    scope: 'write',
     run: async (ctx, deps, args) => {
       const a = transitionArgsSchema.parse(args)
       const result = await transitionWorkOrder(
@@ -168,6 +181,10 @@ async function callTool(
   // Fail-closed RBAC: the agent must hold the tool's required role.
   if (tool.requiredRole && !ctx.roles.includes(tool.requiredRole)) {
     return toolText(id, { error: `Forbidden: ${tool.name} requires role ${tool.requiredRole}` }, true)
+  }
+  // Least-privilege: a scoped token must grant the tool's capability.
+  if (tool.scope && !scopeGrants(ctx.tokenScopes, tool.scope)) {
+    return toolText(id, { error: `Forbidden: ${tool.name} requires scope '${tool.scope}'` }, true)
   }
   const args = params.arguments && typeof params.arguments === 'object' ? params.arguments : {}
   try {

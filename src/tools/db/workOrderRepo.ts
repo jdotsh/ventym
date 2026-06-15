@@ -97,6 +97,7 @@ export function createWorkOrderRepo(db: Database) {
         woLineId?: string
         actorKind: ActorKind
         actorUserId: string | null
+        actorSessionId: string | null
         payload: unknown
       },
     ): Promise<boolean> {
@@ -111,6 +112,7 @@ export function createWorkOrderRepo(db: Database) {
           woLineId: e.woLineId ?? null,
           actorKind: e.actorKind,
           actorUserId: e.actorUserId,
+          actorSessionId: e.actorSessionId,
           payload: e.payload,
         })
         .onConflictDoNothing({ target: eventLog.eventId })

@@ -91,6 +91,7 @@ export async function createWorkOrder(
         woLineId: line.id,
         actorKind: deps.actorKind,
         actorUserId: ctx.userId,
+        actorSessionId: ctx.sessionId,
         payload: {
           role_code: line.roleCode,
           seniority_code: line.seniorityCode,
@@ -165,6 +166,7 @@ export async function transitionWorkOrder(
       eventType: 'WORK_ORDER_VALIDATED',
       actorKind: deps.actorKind,
       actorUserId: ctx.userId,
+      actorSessionId: ctx.sessionId,
       payload: { from: wo.lifecycleStatus, to: next, transition: cmd.transition },
     })
     return ok(updated)

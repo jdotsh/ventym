@@ -1,0 +1,1 @@
+ALTER TABLE "event_log" ADD COLUMN "actor_session_id" varchar(64);

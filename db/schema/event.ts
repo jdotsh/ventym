@@ -31,6 +31,7 @@ export const eventLog = pgTable(
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
     actorKind: varchar('actor_kind', { length: 20 }).$type<ActorKind>().notNull().default('human'),
     actorUserId: uuid('actor_user_id'),
+    actorSessionId: varchar('actor_session_id', { length: 64 }), // which session/token acted (agent attribution)
     entityType: varchar('entity_type', { length: 40 }).notNull(),
     entityId: uuid('entity_id').notNull(),
     eventType: varchar('event_type', { length: 60 }).$type<EventType>().notNull(),

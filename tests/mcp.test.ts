@@ -4,7 +4,7 @@ import type { SessionContext } from '@/services/identity/service'
 import type { WorkosClient } from '@/tools/workos/client'
 import { handleMcpRequest, type McpDeps } from '@/services/mcp/server'
 
-const session = (roles: SessionContext['roles']): SessionContext => ({
+const session = (roles: SessionContext['roles'], tokenScopes?: readonly string[]): SessionContext => ({
   userId: 'u1',
   email: 'a@acme.test',
   displayName: 'A',
@@ -12,7 +12,15 @@ const session = (roles: SessionContext['roles']): SessionContext => ({
   sessionId: 's1',
   roles,
   activeRole: roles[0] ?? null,
+  ...(tokenScopes ? { tokenScopes } : {}),
 })
+
+const callAs = (ctx: SessionContext, name: string, args?: Record<string, unknown>) =>
+  handleMcpRequest(
+    { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, ...(args ? { arguments: args } : {}) } },
+    ctx,
+    deps,
+  )
 
 // whoami + the RBAC gate never touch deps; a stub is enough.
 const deps = { db: {} as Database, workos: {} as WorkosClient } satisfies McpDeps
@@ -46,6 +54,25 @@ describe('handleMcpRequest', () => {
       expect(result.isError).toBe(true)
       expect(result.content[0]?.text).toContain('requires role MANAGER')
     }
+  })
+
+  it('per-token scope: a read-scoped agent is denied a write tool', async () => {
+    const r = await callAs(session(['MANAGER'], ['vms:read']), 'create_work_order')
+    const result = r?.result as { isError: boolean; content: { text: string }[] }
+    expect(result.isError).toBe(true)
+    expect(result.content[0]?.text).toContain("requires scope 'write'")
+  })
+
+  it('per-token scope: a write-scoped agent passes the role+scope gates', async () => {
+    const r = await callAs(session(['MANAGER'], ['vms:write']), 'transition_work_order', {
+      id: '00000000-0000-4000-8000-000000000000',
+      transition: 'submit',
+      expectedVersion: 1,
+    })
+    const text = (r?.result as { content: { text: string }[] }).content[0]?.text ?? ''
+    // Cleared both gates (it fails later on the stub DB, not on authz).
+    expect(text).not.toContain('requires scope')
+    expect(text).not.toContain('requires role')
   })
 
   it('tools/call whoami returns the agent identity', async () => {

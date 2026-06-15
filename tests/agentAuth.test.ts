@@ -31,7 +31,15 @@ describe('createAgentVerifier', () => {
       workosUserId: 'user_1',
       sessionId: 'sess_1',
       organizationId: 'org_1',
+      scopes: [], // no scope claim ⇒ full delegation
     })
+  })
+
+  it('extracts space-delimited OAuth scopes from the token', async () => {
+    const verifier = createAgentVerifier({ authkitDomain: ISSUER, audience: AUDIENCE, jwks })
+    const token = await sign({ sub: 'user_1', sid: 'sess_1', scope: 'vms:read vms:write' })
+    const principal = await verifier.verify(token)
+    expect(principal?.scopes).toEqual(['vms:read', 'vms:write'])
   })
 
   it('rejects a wrong audience', async () => {
