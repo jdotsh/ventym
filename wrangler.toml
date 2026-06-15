@@ -1,0 +1,19 @@
+name = "vms-mvp"
+main = "src/index.ts"
+compatibility_date = "2024-11-27"
+compatibility_flags = ["nodejs_compat"]
+
+# On-prem Postgres reached via Hyperdrive (→ Cloudflare Tunnel in prod).
+# Local dev overrides the origin to the Docker Postgres in .dev.vars.
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "REPLACE_WITH_HYPERDRIVE_ID"
+localConnectionString = "postgres://vms:vms@localhost:5432/vms"
+
+# SLI sink — bound from day one (golden signals, never commented out).
+[[analytics_engine_datasets]]
+binding = "SLI"
+dataset = "vms_sli"
+
+[vars]
+ENVIRONMENT = "local"
