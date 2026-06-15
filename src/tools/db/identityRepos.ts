@@ -1,6 +1,14 @@
-import { and, desc, eq, or } from 'drizzle-orm'
+import { and, desc, eq, or, sql } from 'drizzle-orm'
 import type { Database } from '../../../config/db'
-import { appUser, auditLog, membership, tenant, type ActorKind, type TenantRole } from '../../../db/schema'
+import {
+  appUser,
+  auditLog,
+  membership,
+  tenant,
+  tenantConnection,
+  type ActorKind,
+  type TenantRole,
+} from '../../../db/schema'
 
 export type AppUserRow = typeof appUser.$inferSelect
 export type MembershipRow = typeof membership.$inferSelect
@@ -13,8 +21,23 @@ export type IdentityRepo = ReturnType<typeof createIdentityRepo>
 
 export function createIdentityRepo(db: Database) {
   return {
-    // Single-tenant MVP: the one active tenant. Multi-tenant resolves an
-    // organizationId → tenant_connection here later.
+    // Multi-org routing: which tenant owns this WorkOS organization? Reads the
+    // tenant_connection routing table (pre-session, not RLS-scoped).
+    async resolveTenantByOrganization(organizationId: string): Promise<string | null> {
+      const [row] = await db
+        .select({ tenantId: tenantConnection.tenantId })
+        .from(tenantConnection)
+        .where(
+          and(
+            eq(tenantConnection.providerId, 'workos'),
+            sql`${tenantConnection.config}->>'organizationId' = ${organizationId}`,
+          ),
+        )
+        .limit(1)
+      return row?.tenantId ?? null
+    },
+
+    // Fallback when the user has no organization context (single-org tenants).
     async resolveDefaultTenantId(): Promise<string | null> {
       const [row] = await db
         .select({ id: tenant.id })

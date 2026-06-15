@@ -159,13 +159,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS "tenant_connection_provider" ON "tenant_connec
 -- (not FORCED): the owner role runs migrations/seed; the app connects as the
 -- non-owner role `vms_app`, which RLS enforces. Unset GUC ⇒ NULL ⇒ zero rows.
 ALTER TABLE "membership" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
-ALTER TABLE "tenant_connection" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "session" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "api_token" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "idempotency" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "audit_log" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE POLICY "membership_isolation" ON "membership" USING ("tenant_id" = current_setting('app.tenant_id', true)::uuid) WITH CHECK ("tenant_id" = current_setting('app.tenant_id', true)::uuid);--> statement-breakpoint
-CREATE POLICY "tenant_connection_isolation" ON "tenant_connection" USING ("tenant_id" = current_setting('app.tenant_id', true)::uuid) WITH CHECK ("tenant_id" = current_setting('app.tenant_id', true)::uuid);--> statement-breakpoint
 CREATE POLICY "session_isolation" ON "session" USING ("tenant_id" = current_setting('app.tenant_id', true)::uuid) WITH CHECK ("tenant_id" = current_setting('app.tenant_id', true)::uuid);--> statement-breakpoint
 CREATE POLICY "api_token_isolation" ON "api_token" USING ("tenant_id" = current_setting('app.tenant_id', true)::uuid) WITH CHECK ("tenant_id" = current_setting('app.tenant_id', true)::uuid);--> statement-breakpoint
 CREATE POLICY "idempotency_isolation" ON "idempotency" USING ("tenant_id" = current_setting('app.tenant_id', true)::uuid) WITH CHECK ("tenant_id" = current_setting('app.tenant_id', true)::uuid);--> statement-breakpoint

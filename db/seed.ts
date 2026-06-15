@@ -19,7 +19,7 @@ async function seed(): Promise<void> {
   await db.insert(membership).values({ tenantId: t.id, appUserId: u.id, roles: ['ADMIN'] })
   await db
     .insert(tenantConnection)
-    .values({ tenantId: t.id, providerId: 'workos', config: { organizationId: 'org_placeholder' } })
+    .values({ tenantId: t.id, providerId: 'workos', config: { organizationId: 'org_01KV64ZWNJS5R86C62NJ2DYVZW' } })
   console.log(JSON.stringify({ seeded: { tenant: t.code, admin: u.email } }))
 }
 

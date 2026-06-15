@@ -29,12 +29,22 @@ function displayNameOf(identity: WorkosIdentity): string | null {
   return name.length > 0 ? name : null
 }
 
+// Multi-org: route to the tenant that owns the WorkOS organization; fall back to
+// the default tenant for users with no organization context.
+async function resolveTenant(identity: WorkosIdentity, deps: IdentityDeps): Promise<string | null> {
+  if (identity.organizationId) {
+    const byOrg = await deps.repo.resolveTenantByOrganization(identity.organizationId)
+    if (byOrg) return byOrg
+  }
+  return deps.repo.resolveDefaultTenantId()
+}
+
 /** Callback path: ensure user + membership exist (JIT), return the session context. */
 export async function resolveLoginContext(
   identity: WorkosIdentity,
   deps: IdentityDeps,
 ): Promise<SessionContext> {
-  const tenantId = await deps.repo.resolveDefaultTenantId()
+  const tenantId = await resolveTenant(identity, deps)
   if (!tenantId) throw new Error('no active tenant to admit the user')
 
   const user = await deps.repo.upsertUserByWorkos({
@@ -70,7 +80,7 @@ export async function loadSessionContext(
   const user = await deps.repo.findUserByWorkosId(identity.workosUserId)
   if (!user || !user.isActive) return null
 
-  const tenantId = await deps.repo.resolveDefaultTenantId()
+  const tenantId = await resolveTenant(identity, deps)
   if (!tenantId) return null
 
   const scope = { tenantId, userId: user.id, sessionId: identity.sessionId }

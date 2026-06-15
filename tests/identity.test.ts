@@ -50,6 +50,7 @@ const member = (over: Partial<MembershipRow> = {}): MembershipRow => ({
 function deps(repo: Partial<IdentityDeps['repo']>): IdentityDeps {
   const base: IdentityDeps['repo'] = {
     resolveDefaultTenantId: async () => 't_1',
+    resolveTenantByOrganization: async () => null,
     findUserByWorkosId: async () => user(),
     findUserByEmail: async () => user(),
     upsertUserByWorkos: async () => user(),
@@ -102,7 +103,17 @@ describe('resolveLoginContext (callback JIT)', () => {
   })
 
   it('throws when there is no active tenant', async () => {
-    await expect(resolveLoginContext(identity, deps({ resolveDefaultTenantId: async () => null }))).rejects.toThrow()
+    await expect(
+      resolveLoginContext(identity, deps({ resolveDefaultTenantId: async () => null, resolveTenantByOrganization: async () => null })),
+    ).rejects.toThrow()
+  })
+
+  it('routes to the org-owned tenant when the identity carries an organizationId', async () => {
+    const ctx = await resolveLoginContext(
+      { ...identity, organizationId: 'org_X' },
+      deps({ resolveTenantByOrganization: async () => 't_org' }),
+    )
+    expect(ctx.tenantId).toBe('t_org')
   })
 })
 

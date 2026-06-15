@@ -67,7 +67,8 @@ export const membership = pgTable(
   (t) => [uniqueIndex('membership_tenant_user').on(t.tenantId, t.appUserId)],
 )
 
-// Per-tenant identity-broker config (WorkOS org_id lives in `config`).
+// Per-tenant identity-broker config (WorkOS org_id in `config`). NOT RLS-scoped:
+// it's the org→tenant ROUTING table, read pre-session during login.
 export const tenantConnection = pgTable(
   'tenant_connection',
   {
@@ -140,11 +141,5 @@ export const auditLog = pgTable('audit_log', {
 })
 
 // Tables whose rows are isolated by the `app.tenant_id` GUC (see RLS migration).
-export const TENANT_SCOPED_TABLES = [
-  'membership',
-  'tenant_connection',
-  'session',
-  'api_token',
-  'idempotency',
-] as const
+export const TENANT_SCOPED_TABLES = ['membership', 'session', 'api_token', 'idempotency'] as const
 

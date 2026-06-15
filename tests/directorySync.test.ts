@@ -35,6 +35,7 @@ type Spy = { created: number; suspended: number; audits: number }
 function deps(over: Partial<IdentityRepo>, spy: Spy): DirectoryDeps {
   const base: IdentityRepo = {
     resolveDefaultTenantId: async () => 't1',
+    resolveTenantByOrganization: async () => null,
     findUserByWorkosId: async () => null,
     findUserByEmail: async () => user(),
     suspendMemberships: async () => {
