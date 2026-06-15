@@ -1,4 +1,5 @@
 import type { AppConfig } from './env'
+import type { Database } from './db'
 
 /** Raw Cloudflare Worker env: vars + secrets + bindings. */
 export type WorkerEnv = {
@@ -16,6 +17,7 @@ export type WorkerEnv = {
 export type AppVariables = {
   traceId: string
   config: AppConfig
+  db: Database
 }
 
 export type AppEnv = { Bindings: WorkerEnv; Variables: AppVariables }

@@ -8,7 +8,7 @@ compatibility_flags = ["nodejs_compat"]
 [[hyperdrive]]
 binding = "HYPERDRIVE"
 id = "REPLACE_WITH_HYPERDRIVE_ID"
-localConnectionString = "postgres://vms:vms@localhost:5432/vms"
+localConnectionString = "postgres://vms_app:vms_app@localhost:5433/vms"
 
 # SLI sink — bound from day one (golden signals, never commented out).
 [[analytics_engine_datasets]]
