@@ -1,9 +1,14 @@
+import { z } from 'zod'
 import type { Database } from '../../../config/db'
 import type { TenantRole } from '../../../db/schema'
 import type { SessionContext } from '@/services/identity/service'
 import type { WorkosClient } from '@/tools/workos/client'
 import { buildAdminDeps } from '@/services/admin/deps'
 import { listMembers } from '@/services/admin/service'
+import { buildWorkOrderDeps } from '@/services/workOrder/deps'
+import { createWorkOrder, getWorkOrder, transitionWorkOrder } from '@/services/workOrder/service'
+import { createWorkOrderSchema } from '@/services/workOrder/schema'
+import { WO_TRANSITIONS } from '@/services/workOrder/machine'
 
 // Minimal MCP over JSON-RPC 2.0 (Streamable HTTP). Stateless: one request → one
 // response. Covers initialize / tools.list / tools.call — enough for a governed
@@ -24,16 +29,24 @@ type JsonRpcResponse = {
 export type McpDeps = { db: Database; workos: WorkosClient }
 
 // A tool runs with the AGENT's SessionContext — same identity/roles as the human
-// who authorized it. `requiredRole` is the per-tool RBAC gate.
+// who authorized it. `requiredRole` is the per-tool RBAC gate. `args` are the raw
+// tool arguments; each tool validates them with Zod (boundary validation).
 type McpTool = {
   name: string
   description: string
   inputSchema: object
   requiredRole?: TenantRole
-  run(ctx: SessionContext, deps: McpDeps): Promise<unknown>
+  run(ctx: SessionContext, deps: McpDeps, args: unknown): Promise<unknown>
 }
 
 const NO_ARGS = { type: 'object', properties: {} } as const
+
+const transitionArgsSchema = z.object({
+  id: z.string().uuid(),
+  transition: z.enum(WO_TRANSITIONS),
+  expectedVersion: z.number().int().min(1),
+  idempotencyKey: z.string().optional(),
+})
 
 const TOOLS: readonly McpTool[] = [
   {
@@ -59,6 +72,51 @@ const TOOLS: readonly McpTool[] = [
         buildAdminDeps(deps.db, deps.workos),
       )
       return members.map((m) => ({ email: m.email, roles: m.roles, active: m.isActive }))
+    },
+  },
+  {
+    name: 'get_work_order',
+    description: 'Fetch a work order by id (tenant-scoped).',
+    inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+    run: async (ctx, deps, args) => {
+      const { id } = z.object({ id: z.string().uuid() }).parse(args)
+      const wo = await getWorkOrder(ctx, id, buildWorkOrderDeps(deps.db, 'agent'))
+      return wo ?? { error: 'not_found' }
+    },
+  },
+  {
+    name: 'create_work_order',
+    description: 'Create a draft work order with lines. Requires MANAGER.',
+    inputSchema: { type: 'object', properties: { code: { type: 'string' }, lines: { type: 'array' } }, required: ['code', 'lines'] },
+    requiredRole: 'MANAGER',
+    run: async (ctx, deps, args) => {
+      const input = createWorkOrderSchema.parse(args)
+      const result = await createWorkOrder(ctx, input, buildWorkOrderDeps(deps.db, 'agent'))
+      return result.ok ? result.value : { error: result.error.kind }
+    },
+  },
+  {
+    name: 'transition_work_order',
+    description: 'Apply a lifecycle transition to a work order. Requires MANAGER.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        transition: { type: 'string', enum: WO_TRANSITIONS },
+        expectedVersion: { type: 'integer' },
+        idempotencyKey: { type: 'string' },
+      },
+      required: ['id', 'transition', 'expectedVersion'],
+    },
+    requiredRole: 'MANAGER',
+    run: async (ctx, deps, args) => {
+      const a = transitionArgsSchema.parse(args)
+      const result = await transitionWorkOrder(
+        ctx,
+        { workOrderId: a.id, transition: a.transition, expectedVersion: a.expectedVersion, eventId: a.idempotencyKey ?? crypto.randomUUID() },
+        buildWorkOrderDeps(deps.db, 'agent'),
+      )
+      return result.ok ? result.value : { error: result.error.kind }
     },
   },
 ]
@@ -111,6 +169,11 @@ async function callTool(
   if (tool.requiredRole && !ctx.roles.includes(tool.requiredRole)) {
     return toolText(id, { error: `Forbidden: ${tool.name} requires role ${tool.requiredRole}` }, true)
   }
-  const result = await tool.run(ctx, deps)
-  return toolText(id, result)
+  const args = params.arguments && typeof params.arguments === 'object' ? params.arguments : {}
+  try {
+    return toolText(id, await tool.run(ctx, deps, args))
+  } catch (err) {
+    // Surface Zod/validation errors as a tool error, not a transport crash.
+    return toolText(id, { error: err instanceof Error ? err.message : String(err) }, true)
+  }
 }

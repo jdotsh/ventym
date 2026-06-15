@@ -29,6 +29,10 @@ export const RBAC_POLICY: Readonly<Record<string, PolicyEntry>> = {
   'POST /mcp': PUBLIC, // machine surface — auth is the agent bearer token
   'POST /auth/logout': AUTHENTICATED,
   'GET /dashboard': AUTHENTICATED,
+  // Work Order JSON API — the technical referent (MANAGER) drives the workflow.
+  'POST /api/v1/work-orders': roles('ADMIN', 'MANAGER'),
+  'POST /api/v1/work-orders/:id/transitions': roles('ADMIN', 'MANAGER'),
+  'GET /api/v1/work-orders/:id': AUTHENTICATED,
   'GET /admin/users': roles('ADMIN'),
   'POST /admin/users/:id/roles': roles('ADMIN'),
   'POST /admin/sso/portal': roles('ADMIN'),

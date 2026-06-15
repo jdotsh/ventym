@@ -5,6 +5,7 @@ import type { WorkOrderRepo } from '@/tools/db/workOrderRepo'
 import type { SessionContext } from '@/services/identity/service'
 import { createWorkOrder, transitionWorkOrder, type WorkOrderDeps } from '@/services/workOrder/service'
 import type { CreateWorkOrderInput } from '@/services/workOrder/schema'
+import { workOrderErrorCode } from '@/services/workOrder/httpError'
 
 const ctx: SessionContext = {
   userId: 'user_1',
@@ -195,5 +196,14 @@ describe('transitionWorkOrder (optimistic + idempotent)', () => {
     if (!replay.ok) return
     expect(replay.value.version).toBe(2) // not bumped again
     expect(store.events.size).toBe(before) // no new event
+  })
+})
+
+describe('workOrderErrorCode mapping', () => {
+  it('maps every WorkOrderError kind to a registered domain code', () => {
+    expect(workOrderErrorCode({ kind: 'duplicate_code', code: 'WO-1' })).toBe('WO_DUPLICATE_CODE')
+    expect(workOrderErrorCode({ kind: 'not_found' })).toBe('WO_NOT_FOUND')
+    expect(workOrderErrorCode({ kind: 'invalid_transition', from: 'DRAFT', transition: 'close' })).toBe('WO_INVALID_TRANSITION')
+    expect(workOrderErrorCode({ kind: 'version_conflict' })).toBe('WO_VERSION_CONFLICT')
   })
 })

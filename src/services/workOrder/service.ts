@@ -107,6 +107,15 @@ export async function createWorkOrder(
   })
 }
 
+/** Read one work order by id, tenant-scoped (the explicit predicate is in the repo). */
+export async function getWorkOrder(
+  ctx: SessionContext,
+  id: string,
+  deps: WorkOrderDeps,
+): Promise<WorkOrderRow | null> {
+  return deps.withTenantScope(scopeOf(ctx), (tx) => deps.repo.findById(tx, ctx.tenantId, id))
+}
+
 export type TransitionCommand = {
   workOrderId: string
   transition: WoTransition

@@ -33,6 +33,21 @@ describe('handleMcpRequest', () => {
     expect(names).toContain('list_members')
   })
 
+  it('exposes the work-order tools', async () => {
+    const r = await call('tools/list')
+    const names = (r?.result as { tools: { name: string }[] }).tools.map((t) => t.name)
+    expect(names).toEqual(expect.arrayContaining(['get_work_order', 'create_work_order', 'transition_work_order']))
+  })
+
+  it('fail-closed: a MEMBER agent cannot create or transition work orders', async () => {
+    for (const name of ['create_work_order', 'transition_work_order']) {
+      const r = await call('tools/call', { name })
+      const result = r?.result as { isError: boolean; content: { text: string }[] }
+      expect(result.isError).toBe(true)
+      expect(result.content[0]?.text).toContain('requires role MANAGER')
+    }
+  })
+
   it('tools/call whoami returns the agent identity', async () => {
     const r = await call('tools/call', { name: 'whoami' })
     const text = (r?.result as { content: { text: string }[] }).content[0]?.text ?? '{}'

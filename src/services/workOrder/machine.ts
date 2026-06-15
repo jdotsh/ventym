@@ -9,15 +9,17 @@ import type { WoLifecycleStatus } from '../../../db/schema'
 //   REJECTED_BY_VENDOR ──revise──► DRAFT                              ACTIVE ──close──► CLOSED
 //
 //   * ──cancel──► CANCELLED   (from any non-terminal state)
-export type WoTransition =
-  | 'submit'
-  | 'vendor_accept'
-  | 'vendor_reject'
-  | 'revise'
-  | 'activate'
-  | 'close'
-  | 'cancel'
-  | 'expire'
+export const WO_TRANSITIONS = [
+  'submit',
+  'vendor_accept',
+  'vendor_reject',
+  'revise',
+  'activate',
+  'close',
+  'cancel',
+  'expire',
+] as const
+export type WoTransition = (typeof WO_TRANSITIONS)[number]
 
 const TRANSITIONS: Readonly<Record<WoLifecycleStatus, Partial<Record<WoTransition, WoLifecycleStatus>>>> = {
   DRAFT: { submit: 'PENDING_VENDOR_ACCEPT', cancel: 'CANCELLED' },
