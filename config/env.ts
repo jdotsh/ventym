@@ -10,6 +10,7 @@ const configSchema = z.object({
   WORKOS_WEBHOOK_SECRET: z.string().or(z.literal('')).default(''), // Directory Sync events
   WORKOS_AUTHKIT_DOMAIN: z.string().url().or(z.literal('')).default(''), // OAuth issuer for agent tokens
   SESSION_SECRET: z.string().min(32),
+  CONNECTION_SECRETS_KEY: z.string().default(''), // base64 master key for the per-tenant secret vault
 })
 
 export type AppConfig = z.infer<typeof configSchema>
