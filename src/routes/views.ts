@@ -25,7 +25,8 @@ export const viewRoutes = new Hono<AppEnv>()
   .get('/assets/app.css', (c) =>
     c.body(APP_CSS, 200, {
       'Content-Type': 'text/css; charset=utf-8',
-      'Cache-Control': 'public, max-age=3600',
+      // Local dev: never cache, so style edits show on a normal refresh. Prod: 1h.
+      'Cache-Control': c.get('config').ENVIRONMENT === 'local' ? 'no-store' : 'public, max-age=3600',
     }),
   )
 

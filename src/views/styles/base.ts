@@ -5,14 +5,14 @@ export const BASE = `
 html{-webkit-text-size-adjust:100%}
 body{font-family:var(--font);font-size:var(--fs-body);line-height:var(--lh-body);
   color:var(--ink);background:var(--surface);-webkit-font-smoothing:antialiased;
-  font-feature-settings:'cv05','ss01'}
-h1,h2,h3{font-weight:600;letter-spacing:-.02em;line-height:var(--lh-tight);color:var(--ink)}
-h1{font-size:var(--fs-h1)}
+  -moz-osx-font-smoothing:grayscale;font-feature-settings:'ss01' 1,'cv11' 1;letter-spacing:-.005em}
+h1,h2,h3{font-weight:600;letter-spacing:-.025em;line-height:var(--lh-tight);color:var(--ink)}
+h1{font-size:var(--fs-h1);letter-spacing:-.02em}
 h2{font-size:var(--fs-h2);margin-top:var(--sp-2)}
 h3{font-size:var(--fs-h3)}
 p{line-height:var(--lh-body);color:var(--ink-soft)}
-a{color:var(--navy-600);text-decoration:none;transition:color .14s}
-a:hover{color:var(--navy);text-decoration:underline}
+a{color:var(--navy);text-decoration:none;border-bottom:1px solid transparent;transition:border-color .14s}
+a:hover{border-bottom-color:var(--amber)}
 code,.mono{font-family:var(--mono);font-size:.9em;font-variant-numeric:tabular-nums}
 :where(button,a,input,select,textarea):focus-visible{outline:3px solid var(--amber);
   outline-offset:2px;border-radius:var(--r-sm)}
