@@ -5,10 +5,12 @@ description: Use when adding or changing the server-rendered UI — pages, compo
 
 # ventym frontend skill
 
-No SPA. The UI is a server-rendered MPA with `hono/html` in `src/views/`, styled by a
-token-driven, **modular** CSS system (`views/styles/{tokens,base,components,index}.ts`)
+**Design SSOT: `docs/design-system.md`** (read before ANY visual change — mission, brand,
+the locked type ladder, color/amber-accent rules, components, a11y, tone). Binding rules:
+`docs/RULES.md` R-45–48. No SPA: a server-rendered MPA with `hono/html` in `src/views/`,
+styled by a token-driven, **modular** CSS system (`views/styles/{tokens,base,components,index}.ts`)
 — modular from day one (the anti-`styles.ts`-monolith rule). Compose existing tokens;
-never invent styles.
+never invent styles or raw hex/px.
 
 ## Where things live
 
