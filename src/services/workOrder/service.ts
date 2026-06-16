@@ -108,6 +108,15 @@ export async function createWorkOrder(
   })
 }
 
+/** List work orders for the caller's tenant, newest first (tenant-scoped). */
+export async function listWorkOrders(
+  ctx: SessionContext,
+  deps: WorkOrderDeps,
+  limit = 100,
+): Promise<WorkOrderRow[]> {
+  return deps.withTenantScope(scopeOf(ctx), (tx) => deps.repo.listByTenant(tx, ctx.tenantId, limit))
+}
+
 /** Read one work order by id, tenant-scoped (the explicit predicate is in the repo). */
 export async function getWorkOrder(
   ctx: SessionContext,

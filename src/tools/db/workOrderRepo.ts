@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import type { Database } from '../../../config/db'
 import {
   eventLog,
@@ -33,6 +33,17 @@ export function createWorkOrderRepo(db: Database) {
       values: (typeof workOrderLine.$inferInsert)[],
     ): Promise<WorkOrderLineRow[]> {
       return tx.insert(workOrderLine).values(values).returning()
+    },
+
+    // Tenant-scoped list (newest first). The explicit tenant predicate is the read
+    // wall (defence-in-depth alongside RLS).
+    async listByTenant(tx: Database, tenantId: string, limit: number): Promise<WorkOrderRow[]> {
+      return tx
+        .select()
+        .from(workOrder)
+        .where(eq(workOrder.tenantId, tenantId))
+        .orderBy(desc(workOrder.createdAt))
+        .limit(limit)
     },
 
     async findById(tx: Database, tenantId: string, id: string): Promise<WorkOrderRow | null> {

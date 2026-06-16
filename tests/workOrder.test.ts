@@ -89,6 +89,8 @@ function fakeStore() {
       lines.push(...rows)
       return rows
     },
+    listByTenant: async (_tx, tenantId, limit) =>
+      [...wos.values()].filter((w) => w.tenantId === tenantId).slice(0, limit),
     findById: async (_tx, tenantId, id) => {
       const w = wos.get(id)
       return w && w.tenantId === tenantId ? w : null

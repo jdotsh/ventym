@@ -2,6 +2,9 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../../config/bindings'
 import { dashboardPage } from '@/views/pages/dashboard'
 import { loginPage } from '@/views/pages/login'
+import { workOrdersPage } from '@/views/pages/workOrders'
+import { buildWorkOrderDeps } from '@/services/workOrder/deps'
+import { listWorkOrders } from '@/services/workOrder/service'
 import { resolveLocale } from '@/views/i18n'
 import { APP_CSS } from '@/views/styles'
 
@@ -27,4 +30,12 @@ export const viewRoutes = new Hono<AppEnv>()
     const session = c.get('session')
     if (!session) return c.redirect('/login')
     return c.html(dashboardPage({ locale: resolveLocale(c.req.query('lang')), session }))
+  })
+
+  .get('/work-orders', async (c) => {
+    const session = c.get('session')
+    if (!session) return c.redirect('/login')
+    // REAL data: the same workOrder service the JSON API + MCP tools use, tenant-scoped.
+    const workOrders = await listWorkOrders(session, buildWorkOrderDeps(c.get('db'), 'human'))
+    return c.html(workOrdersPage({ locale: resolveLocale(c.req.query('lang')), session, workOrders }))
   })
