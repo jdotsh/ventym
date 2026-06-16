@@ -66,7 +66,7 @@ One aggregate = one schema file = one repo = one service folder = one MCP tool f
 You can hold any vertical slice in your head.
 
 ```
-vms-mvp/
+ventym/
 ├── config/                 env.ts · db.ts (withTenantScope) · bindings.ts            [done]
 ├── db/
 │   ├── schema/             one file per aggregate (split before it ever becomes a monolith)

@@ -5,7 +5,7 @@ import { logger, serializeError } from '@/utils/logger'
 
 // Liveness (always 200 if deployed) + readiness (DB ping).
 export const healthRoutes = new Hono<AppEnv>()
-  .get('/health', (c) => c.json({ status: 'ok', service: 'vms-mvp', time: new Date().toISOString() }))
+  .get('/health', (c) => c.json({ status: 'ok', service: 'ventym', time: new Date().toISOString() }))
   .get('/health/ready', async (c) => {
     try {
       await c.get('db').execute(sql`select 1`)

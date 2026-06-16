@@ -1,6 +1,6 @@
 /**
  * Central error registry — the single source of truth for every server-side
- * failure mode, in two layers (ported from Athena, seeded for vms-mvp):
+ * failure mode, in two layers (ported from Athena, seeded for ventym):
  *
  *   1. gRPC canonical codes (16, frozen) — describe HOW a client reacts. They
  *      drive HTTP status, retryability, and log level. A generic SDK/agent reads
@@ -64,7 +64,7 @@ export type DomainRegistryEntry = {
   retryAfterSeconds?: number
 }
 
-// Domain codes — every error a vms-mvp service/route can emit. Add a row to
+// Domain codes — every error a ventym service/route can emit. Add a row to
 // register a new code; resolveError() throws on an unregistered code (drift guard).
 export const DOMAIN_REGISTRY = {
   // Work Order lifecycle

@@ -47,7 +47,7 @@ jobs:
       # Post-deploy smoke: /health/ready must be 200. (Wire rollback to your infra.)
       - name: Smoke test
         run: |
-          url="https://vms-mvp-${{ steps.env.outputs.name }}.<your-account>.workers.dev/health/ready"
+          url="https://ventym-${{ steps.env.outputs.name }}.<your-account>.workers.dev/health/ready"
           for i in 1 2 3 4 5; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)
             [ "$code" = "200" ] && echo "ready ✓" && exit 0

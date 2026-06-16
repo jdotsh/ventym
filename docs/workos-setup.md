@@ -1,4 +1,4 @@
-# WorkOS setup (vms-mvp)
+# WorkOS setup (ventym)
 
 vms uses WorkOS as a **feed-only identity broker**: WorkOS *authenticates* (AuthKit —
 password, MFA, SSO); vms *authorizes* via its own `membership` table. **Roles never
