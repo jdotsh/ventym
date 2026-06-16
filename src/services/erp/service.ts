@@ -94,18 +94,23 @@ export async function bookTimesheet(
     const existing = await deps.erpRepo.findExportByEntity(tx, ctx.tenantId, 'timesheet', cmd.timesheetId)
     let erpRef = existing?.erpDocumentRef ?? null
     if (!erpRef) {
-      const posted = await deps.erp.postGoodsReceipt({
+      const exportLogId = deps.uuid()
+      const emit = await deps.erp.send({
+        kind: 'GOODS_RECEIPT',
         tenantId: ctx.tenantId,
         entityType: 'timesheet',
         entityId: cmd.timesheetId,
+        exportLogId, // idempotency key: a replayed post returns the same ERP doc
         poCode: woErp.poCode ?? '',
         amountExcl: ts.totalExcl,
         currency: woErp.currency,
       })
-      erpRef = posted.erpDocumentRef
+      if (emit.type === 'failed') return err<ErpError>({ kind: 'erp_send_failed', retriable: emit.retriable })
+      if (emit.type === 'skipped') return err<ErpError>({ kind: 'erp_skipped', reason: emit.reason })
+      erpRef = emit.erpDocumentRef
       const payloadHash = await sha256Hex(`${ctx.tenantId}:timesheet:${cmd.timesheetId}:${ts.totalExcl}:${woErp.poCode ?? ''}`)
       await deps.erpRepo.insertExport(tx, {
-        id: deps.uuid(),
+        id: exportLogId,
         tenantId: ctx.tenantId,
         entityType: 'timesheet',
         entityId: cmd.timesheetId,

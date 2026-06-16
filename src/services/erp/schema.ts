@@ -17,3 +17,5 @@ export type ErpError =
   | { kind: 'ts_not_found' }
   | { kind: 'ts_not_approved' }
   | { kind: 'erp_not_linked' } // the parked-approval gate: WO not LINKED
+  | { kind: 'erp_send_failed'; retriable: boolean } // the adapter could not post
+  | { kind: 'erp_skipped'; reason: string } // intentional no-op (e.g. zero-amount)

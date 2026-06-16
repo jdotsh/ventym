@@ -83,6 +83,8 @@ export const DOMAIN_REGISTRY = {
   // ERP money loop
   WO_ERP_ALREADY_LINKED: { grpc: 'ALREADY_EXISTS', description: 'Work order is already linked to a PO' },
   ERP_NOT_LINKED: { grpc: 'FAILED_PRECONDITION', description: "Work order has no PO linked — the approval is parked until AP links it" },
+  ERP_SEND_FAILED: { grpc: 'UNAVAILABLE', description: 'ERP posting failed; the dispatcher will retry' },
+  ERP_EXPORT_SKIPPED: { grpc: 'FAILED_PRECONDITION', description: 'ERP export skipped (e.g. a zero-amount posting)' },
   // Staffing (vendor / worker / assignment)
   VENDOR_NOT_FOUND: { grpc: 'NOT_FOUND', description: 'Vendor not found in tenant scope' },
   VENDOR_DUPLICATE_CODE: { grpc: 'ALREADY_EXISTS', description: 'A vendor with this code already exists' },

@@ -16,6 +16,10 @@ export function erpErrorCode(error: ErpError): DomainCode {
       return 'TS_INVALID_TRANSITION'
     case 'erp_not_linked':
       return 'ERP_NOT_LINKED'
+    case 'erp_send_failed':
+      return 'ERP_SEND_FAILED'
+    case 'erp_skipped':
+      return 'ERP_EXPORT_SKIPPED'
     default: {
       const unhandled: never = error
       throw new Error(`unhandled erp error kind: ${JSON.stringify(unhandled)}`)

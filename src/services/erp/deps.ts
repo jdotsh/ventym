@@ -3,7 +3,7 @@ import type { ActorKind } from '../../../db/schema'
 import { createWorkOrderRepo } from '@/tools/db/workOrderRepo'
 import { createTimesheetRepo } from '@/tools/db/timesheetRepo'
 import { createErpRepo } from '@/tools/db/erpRepo'
-import { createStubErpAdapter } from '@/tools/erp/adapter'
+import { createMockErpAdapter } from '@/tools/erp/adapter'
 import { randomId } from '@/utils/ids'
 import type { ErpDeps } from './service'
 
@@ -14,7 +14,7 @@ export function buildErpDeps(db: Database, actorKind: ActorKind = 'human'): ErpD
     woRepo: createWorkOrderRepo(db),
     tsRepo: createTimesheetRepo(db),
     erpRepo: createErpRepo(db),
-    erp: createStubErpAdapter(),
+    erp: createMockErpAdapter(),
     withTenantScope: (scope, fn) => withTenantScope(db, scope, fn),
     uuid: randomId,
     now: () => new Date(),
