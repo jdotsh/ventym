@@ -43,7 +43,10 @@ export const authRoutes = new Hono<AppEnv>()
 
     try {
       const { identity, sealedSession } = await c.get('workos').completeLogin(code)
-      await resolveLoginContext(identity, buildIdentityDeps(c.get('db')))
+      // LOCAL-ONLY: admit a fresh login as a full referent so the whole app is testable.
+      // Deployed envs admit as MEMBER (least privilege) — admins grant roles explicitly.
+      const jitRoles = c.get('config').ENVIRONMENT === 'local' ? (['ADMIN', 'MANAGER'] as const) : (['MEMBER'] as const)
+      await resolveLoginContext(identity, buildIdentityDeps(c.get('db')), jitRoles)
       setCookie(c, SESSION_COOKIE, sealedSession, cookie(c.get('config').ENVIRONMENT !== 'local', SESSION_TTL_SEC))
       return c.redirect('/dashboard')
     } catch (err) {

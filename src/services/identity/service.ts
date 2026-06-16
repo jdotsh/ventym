@@ -42,10 +42,14 @@ async function resolveTenant(identity: WorkosIdentity, deps: IdentityDeps): Prom
   return deps.repo.resolveDefaultTenantId()
 }
 
-/** Callback path: ensure user + membership exist (JIT), return the session context. */
+/** Callback path: ensure user + membership exist (JIT), return the session context.
+ *  `jitRoles` is the role set granted to a BRAND-NEW membership (existing members keep
+ *  theirs). Deployed envs pass [MEMBER]; local dev passes [ADMIN, MANAGER] so a fresh
+ *  login can exercise the whole app. */
 export async function resolveLoginContext(
   identity: WorkosIdentity,
   deps: IdentityDeps,
+  jitRoles: readonly TenantRole[] = [DEFAULT_ROLE],
 ): Promise<SessionContext> {
   const tenantId = await resolveTenant(identity, deps)
   if (!tenantId) throw new Error('no active tenant to admit the user')
@@ -60,7 +64,7 @@ export async function resolveLoginContext(
   const roles = await deps.withTenantScope(scope, async (tx) => {
     const existing = await deps.repo.findActiveMembership(tx, user.id)
     const member =
-      existing ?? (await deps.repo.createMembership(tx, { tenantId, appUserId: user.id, roles: [DEFAULT_ROLE] }))
+      existing ?? (await deps.repo.createMembership(tx, { tenantId, appUserId: user.id, roles: [...jitRoles] }))
     return member.roles
   })
 
