@@ -31,6 +31,8 @@ async function seed(): Promise<void> {
   if (!t || !admin || !submitter) throw new Error('seed failed')
 
   await db.insert(membership).values({ tenantId: t.id, appUserId: admin.id, roles: ['ADMIN', 'MANAGER'] })
+  // pm@acme.test is a MEMBER — so you can log in as a non-admin too (dev login).
+  await db.insert(membership).values({ tenantId: t.id, appUserId: submitter.id, roles: ['MEMBER'] })
   await db
     .insert(tenantConnection)
     .values({ tenantId: t.id, providerId: 'workos', config: { organizationId: 'org_01KV64ZWNJS5R86C62NJ2DYVZW' } })

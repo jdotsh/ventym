@@ -33,7 +33,8 @@ export const viewRoutes = new Hono<AppEnv>()
     if (c.get('session')) return c.redirect('/dashboard')
     const locale = resolveLocale(c.req.query('lang'))
     const error = c.req.query('error')
-    return c.html(loginPage({ locale, ...(error ? { error } : {}) }))
+    const dev = c.get('config').ENVIRONMENT === 'local'
+    return c.html(loginPage({ locale, dev, ...(error ? { error } : {}) }))
   })
 
   .get('/dashboard', (c) => {
