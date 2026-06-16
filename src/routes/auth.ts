@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import type { CookieOptions } from 'hono/utils/cookie'
 import type { AppEnv } from '../../config/bindings'
-import { SESSION_COOKIE } from '@/middleware/session'
+import { DEV_SESSION_COOKIE, SESSION_COOKIE } from '@/middleware/session'
 import { buildIdentityDeps } from '@/services/identity/deps'
 import { resolveLoginContext } from '@/services/identity/service'
 import { logger, serializeError } from '@/utils/logger'
@@ -33,6 +33,15 @@ export const authRoutes = new Hono<AppEnv>()
   .get('/auth/login', (c) => startAuth(c, 'sign-in'))
   .get('/auth/signup', (c) => startAuth(c, 'sign-up'))
 
+  // LOCAL-ONLY login bypass: set a `vms_dev` cookie for a seeded user, no WorkOS.
+  // 404s in every deployed env. `?email=` selects the user (default: the seeded admin).
+  .get('/auth/dev', (c) => {
+    if (c.get('config').ENVIRONMENT !== 'local') return c.notFound()
+    const email = (c.req.query('email') ?? 'admin@acme.test').toLowerCase()
+    setCookie(c, DEV_SESSION_COOKIE, email, cookie(false, SESSION_TTL_SEC))
+    return c.redirect('/dashboard')
+  })
+
   // Exchange the code, JIT the user + membership, set the sealed session.
   .get('/auth/callback', async (c) => {
     const code = c.req.query('code')
@@ -58,6 +67,7 @@ export const authRoutes = new Hono<AppEnv>()
   .post('/auth/logout', async (c) => {
     const sealed = getCookie(c, SESSION_COOKIE)
     deleteCookie(c, SESSION_COOKIE, { path: '/' })
+    deleteCookie(c, DEV_SESSION_COOKIE, { path: '/' }) // clear the local dev session too
     if (sealed) {
       const url = await c.get('workos').logoutUrl(sealed).catch(() => null)
       if (url) return c.redirect(url)

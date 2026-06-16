@@ -79,6 +79,35 @@ export async function resolveLoginContext(
   }
 }
 
+/**
+ * LOCAL-ONLY dev login: resolve a SessionContext from an email, with NO WorkOS
+ * round-trip. Only ever called when ENVIRONMENT === 'local' (the session middleware
+ * gates it). Loads a REAL, active user + their membership — it grants no access that
+ * the membership table doesn't already encode. Returns null if the user/membership
+ * is absent or inactive.
+ */
+export async function loadDevSessionContext(
+  email: string,
+  deps: IdentityDeps,
+): Promise<SessionContext | null> {
+  const user = await deps.repo.findUserByEmail(email)
+  if (!user || !user.isActive) return null
+  const tenantId = await deps.repo.resolveDefaultTenantId()
+  if (!tenantId) return null
+  const scope = { tenantId, userId: user.id, sessionId: 'dev-local' }
+  const member = await deps.withTenantScope(scope, (tx) => deps.repo.findActiveMembership(tx, user.id))
+  if (!member) return null
+  return {
+    userId: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    tenantId,
+    sessionId: 'dev-local',
+    roles: member.roles,
+    activeRole: pickActiveRole(member.roles),
+  }
+}
+
 /** Per-request path: load context read-only (roles re-checked every request). */
 export async function loadSessionContext(
   identity: WorkosIdentity,
