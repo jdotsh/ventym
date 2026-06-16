@@ -150,6 +150,7 @@ export const TENANT_SCOPED_TABLES = ['membership', 'session', 'api_token', 'idem
 // Defined after the foundation tables so their `references(() => tenant.id)` see
 // an initialised `tenant` binding during module evaluation.
 export * from './schema/workOrder'
+export * from './schema/procurement'
 export * from './schema/timesheet'
 export * from './schema/erp'
 export * from './schema/event'

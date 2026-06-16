@@ -16,6 +16,9 @@ import { createTimesheetSchema } from '@/services/timesheet/schema'
 import type { TimesheetTransition } from '@/services/timesheet/machine'
 import { buildErpDeps } from '@/services/erp/deps'
 import { bookTimesheet, linkPurchaseOrder } from '@/services/erp/service'
+import { buildStaffingDeps } from '@/services/staffing/deps'
+import { createAssignment, createVendor, createWorker, endAssignment, getVendor, getWorker } from '@/services/staffing/service'
+import { createAssignmentSchema, createVendorSchema, createWorkerSchema } from '@/services/staffing/schema'
 
 // Minimal MCP over JSON-RPC 2.0 (Streamable HTTP). Stateless: one request → one
 // response. Covers initialize / tools.list / tools.call — a governed agent
@@ -219,6 +222,74 @@ export const TOOLS: readonly McpTool[] = [
         ctx,
         { timesheetId: a.id, expectedVersion: a.expectedVersion, eventId: a.idempotencyKey ?? crypto.randomUUID() },
         buildErpDeps(deps.db, 'agent'),
+      )
+      return result.ok ? result.value : { error: result.error.kind }
+    },
+  },
+  {
+    name: 'get_vendor',
+    description: 'Fetch a vendor by id (tenant-scoped).',
+    inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+    route: 'GET /api/v1/vendors/:id',
+    run: async (ctx, deps, args) => {
+      const { id } = z.object({ id: z.string().uuid() }).parse(args)
+      return (await getVendor(ctx, id, buildStaffingDeps(deps.db, 'agent'))) ?? { error: 'not_found' }
+    },
+  },
+  {
+    name: 'create_vendor',
+    description: 'Onboard a vendor (supplier org).',
+    inputSchema: { type: 'object', properties: { code: { type: 'string' }, name: { type: 'string' }, vatNumber: { type: 'string' } }, required: ['code', 'name'] },
+    route: 'POST /api/v1/vendors',
+    run: async (ctx, deps, args) => {
+      const input = createVendorSchema.parse(args)
+      const result = await createVendor(ctx, input, buildStaffingDeps(deps.db, 'agent'))
+      return result.ok ? result.value : { error: result.error.kind }
+    },
+  },
+  {
+    name: 'get_worker',
+    description: "Fetch a worker by id, with the person's name/email resolved in-tenant.",
+    inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+    route: 'GET /api/v1/workers/:id',
+    run: async (ctx, deps, args) => {
+      const { id } = z.object({ id: z.string().uuid() }).parse(args)
+      return (await getWorker(ctx, id, buildStaffingDeps(deps.db, 'agent'))) ?? { error: 'not_found' }
+    },
+  },
+  {
+    name: 'create_worker',
+    description: 'Create a worker under a vendor (person-PII is isolated to the sensitive schema).',
+    inputSchema: { type: 'object', properties: { vendorId: { type: 'string' }, name: { type: 'string' }, email: { type: 'string' }, skillCode: { type: 'string' }, seniorityCode: { type: 'string' } }, required: ['vendorId', 'name'] },
+    route: 'POST /api/v1/workers',
+    run: async (ctx, deps, args) => {
+      const input = createWorkerSchema.parse(args)
+      const result = await createWorker(ctx, input, buildStaffingDeps(deps.db, 'agent'))
+      return result.ok ? result.value : { error: result.error.kind }
+    },
+  },
+  {
+    name: 'create_assignment',
+    description: 'Assign a worker to a work order line (enforces the I6 capacity cap).',
+    inputSchema: { type: 'object', properties: { workOrderLineId: { type: 'string' }, workerId: { type: 'string' }, plannedDays: { type: 'number' }, startDate: { type: 'string' }, endDate: { type: 'string' } }, required: ['workOrderLineId', 'workerId', 'plannedDays', 'startDate', 'endDate'] },
+    route: 'POST /api/v1/assignments',
+    run: async (ctx, deps, args) => {
+      const input = createAssignmentSchema.parse(args)
+      const result = await createAssignment(ctx, input, buildStaffingDeps(deps.db, 'agent'))
+      return result.ok ? result.value : { error: result.error.kind }
+    },
+  },
+  {
+    name: 'end_assignment',
+    description: 'End an assignment (PENDING/ACTIVE → ENDED with a reason).',
+    inputSchema: { type: 'object', properties: { id: { type: 'string' }, expectedVersion: { type: 'integer' }, endReason: { type: 'string' }, idempotencyKey: { type: 'string' } }, required: ['id', 'expectedVersion'] },
+    route: 'POST /api/v1/assignments/:id/end',
+    run: async (ctx, deps, args) => {
+      const a = z.object({ id: z.string().uuid(), expectedVersion: z.number().int().min(1), endReason: z.string().optional(), idempotencyKey: z.string().optional() }).parse(args)
+      const result = await endAssignment(
+        ctx,
+        { assignmentId: a.id, expectedVersion: a.expectedVersion, eventId: a.idempotencyKey ?? crypto.randomUUID(), ...(a.endReason ? { endReason: a.endReason } : {}) },
+        buildStaffingDeps(deps.db, 'agent'),
       )
       return result.ok ? result.value : { error: result.error.kind }
     },

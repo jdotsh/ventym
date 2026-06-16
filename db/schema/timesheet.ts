@@ -13,6 +13,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { appUser, tenant } from '../schema'
 import { workOrderLine } from './workOrder'
+import { assignment } from './procurement'
 
 // Timesheet lifecycle. APPROVED ≠ BOOKED: booking is gated on the WO's
 // erp_link_status = LINKED (the parked-approval gate, wired in D4).
@@ -32,6 +33,7 @@ export const timesheet = pgTable(
     workOrderLineId: uuid('work_order_line_id')
       .notNull()
       .references(() => workOrderLine.id),
+    assignmentId: uuid('assignment_id').references(() => assignment.id), // the staffing grain (nullable; D5)
     periodStart: date('period_start').notNull(),
     periodEnd: date('period_end').notNull(),
     status: varchar('status', { length: 20 }).$type<TimesheetStatus>().notNull().default('DRAFT'),

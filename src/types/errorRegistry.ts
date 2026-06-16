@@ -83,6 +83,14 @@ export const DOMAIN_REGISTRY = {
   // ERP money loop
   WO_ERP_ALREADY_LINKED: { grpc: 'ALREADY_EXISTS', description: 'Work order is already linked to a PO' },
   ERP_NOT_LINKED: { grpc: 'FAILED_PRECONDITION', description: "Work order has no PO linked — the approval is parked until AP links it" },
+  // Staffing (vendor / worker / assignment)
+  VENDOR_NOT_FOUND: { grpc: 'NOT_FOUND', description: 'Vendor not found in tenant scope' },
+  VENDOR_DUPLICATE_CODE: { grpc: 'ALREADY_EXISTS', description: 'A vendor with this code already exists' },
+  WORKER_NOT_FOUND: { grpc: 'NOT_FOUND', description: 'Worker not found in tenant scope' },
+  WO_LINE_NOT_FOUND: { grpc: 'NOT_FOUND', description: 'Work order line not found in tenant scope' },
+  ASSIGNMENT_NOT_FOUND: { grpc: 'NOT_FOUND', description: 'Assignment not found in tenant scope' },
+  ASSIGNMENT_INVALID_TRANSITION: { grpc: 'FAILED_PRECONDITION', description: 'Illegal assignment transition for current state' },
+  CAPACITY_EXCEEDED: { grpc: 'FAILED_PRECONDITION', description: 'Assignment exceeds the WO line planned days (I6)' },
   // Auth / authz
   UNAUTHORIZED: { grpc: 'UNAUTHENTICATED', description: 'Session missing or invalid' },
   FORBIDDEN: { grpc: 'PERMISSION_DENIED', description: 'Authenticated but not authorised for this action' },

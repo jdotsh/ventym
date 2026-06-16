@@ -43,6 +43,7 @@ function fakeStore(rate: string | null = '500.0000') {
         tenantId: v.tenantId,
         version: 1,
         workOrderLineId: v.workOrderLineId,
+        assignmentId: null,
         periodStart: v.periodStart,
         periodEnd: v.periodEnd,
         status: 'DRAFT',

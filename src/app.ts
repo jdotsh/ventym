@@ -20,6 +20,7 @@ import { mcpRoutes } from '@/routes/mcp'
 import { workOrderApiRoutes } from '@/routes/api/v1/workOrders'
 import { timesheetApiRoutes } from '@/routes/api/v1/timesheets'
 import { erpApiRoutes } from '@/routes/api/v1/erp'
+import { staffingApiRoutes } from '@/routes/api/v1/staffing'
 import { openapiRoutes } from '@/routes/openapi'
 import { viewRoutes } from '@/routes/views'
 import { healthRoutes } from '@/routes/health'
@@ -98,6 +99,7 @@ export function createApp(): Hono<AppEnv> {
   app.route('/', workOrderApiRoutes)
   app.route('/', timesheetApiRoutes)
   app.route('/', erpApiRoutes)
+  app.route('/', staffingApiRoutes)
   app.route('/', openapiRoutes)
   app.route('/', viewRoutes)
   app.route('/', adminRoutes)

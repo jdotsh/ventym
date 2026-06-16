@@ -8,8 +8,10 @@
  */
 import { sql } from 'drizzle-orm'
 import { createDatabase, withTenantScope } from '../config/db'
-import { appUser, erpExport, eventLog, idempotency, tenant, timesheet, workOrder } from '../db/schema'
+import { appUser, assignment, erpExport, eventLog, idempotency, partyPii, tenant, timesheet, vendor, worker, workOrder } from '../db/schema'
 import { createIdempotencyRepo } from '../src/tools/db/idempotencyRepo'
+import { buildStaffingDeps } from '../src/services/staffing/deps'
+import { createAssignment, createVendor, createWorker, endAssignment, getWorker } from '../src/services/staffing/service'
 import { buildWorkOrderDeps } from '../src/services/workOrder/deps'
 import { createWorkOrder, getWorkOrder, transitionWorkOrder } from '../src/services/workOrder/service'
 import { buildTimesheetDeps } from '../src/services/timesheet/deps'
@@ -184,7 +186,37 @@ async function main(): Promise<void> {
   const rebook = await bookTimesheet(approver, { timesheetId: tsId, expectedVersion: 3, eventId: bookEvt }, edeps)
   check('money loop: re-book with same event_id is a no-op (still BOOKED)', rebook.ok && rebook.value.status === 'BOOKED')
 
-  // Cleanup (FK order: events → exports → timesheets → work orders [lines cascade] → idem → tenants → users).
+  // 8. Staffing: vendor → worker (PII isolated) → assignment (I6 capacity) → end.
+  const sdeps = buildStaffingDeps(app, 'agent')
+  const ven = await createVendor(ctx, { code: `V_${sfx}`, name: 'Acme Sub' }, sdeps)
+  check('staffing: createVendor', ven.ok)
+  if (!ven.ok) throw new Error('vendor failed')
+  const wk = await createWorker(ctx, { vendorId: ven.value.id, name: 'Anna Bianchi', email: 'anna@sub.test', skillCode: 'JAVA', seniorityCode: 'SENIOR' }, sdeps)
+  check('staffing: createWorker', wk.ok)
+  if (!wk.ok) throw new Error('worker failed')
+  // PII isolation: the worker row carries a surrogate; the name lives in sensitive.party_pii.
+  const [wkRow] = await owner.select().from(worker).where(sql`${worker.id} = ${wk.value.id}`).limit(1)
+  check('staffing: worker row carries the party surrogate (no inline name)', wkRow?.partyId === wk.value.partyId)
+  const [piiRow] = await owner.select().from(partyPii).where(sql`${partyPii.partyId} = ${wk.value.partyId}`).limit(1)
+  check('staffing: person-PII lives in sensitive.party_pii', piiRow?.name === 'Anna Bianchi')
+  const resolved = await getWorker(ctx, wk.value.id, sdeps)
+  check('staffing: getWorker resolves the name in-tenant', resolved?.name === 'Anna Bianchi')
+  const [wkEv] = await owner.select().from(eventLog).where(sql`${eventLog.eventType} = 'WORKER_CREATED' AND ${eventLog.entityId} = ${wk.value.id}`).limit(1)
+  check('staffing: WORKER_CREATED event is PII-free', wkEv !== undefined && !JSON.stringify(wkEv?.payload).includes('Anna'))
+  // Assignment + I6 (line0 has 10 planned days).
+  const as1 = await createAssignment(ctx, { workOrderLineId: line0.id, workerId: wk.value.id, plannedDays: 8, startDate: '2026-01-01', endDate: '2026-01-31' }, sdeps)
+  check('staffing: assignment within capacity (8 ≤ 10)', as1.ok)
+  const as2 = await createAssignment(ctx, { workOrderLineId: line0.id, workerId: wk.value.id, plannedDays: 5, startDate: '2026-02-01', endDate: '2026-02-28' }, sdeps)
+  check('staffing: I6 blocks over-allocation (8 + 5 > 10)', !as2.ok && as2.error.kind === 'capacity_exceeded')
+  if (!as1.ok) throw new Error('assignment failed')
+  const ended = await endAssignment(ctx, { assignmentId: as1.value.id, expectedVersion: 1, eventId: crypto.randomUUID(), endReason: 'WORKER_RESIGNED' }, sdeps)
+  check('staffing: end assignment → ENDED', ended.ok && ended.value.status === 'ENDED')
+
+  // Cleanup (FK order: assignments → workers → vendors → party_pii → events → exports → timesheets → WOs → idem → tenants → users).
+  await owner.delete(assignment).where(sql`${assignment.tenantId} IN (${t1.id}, ${t2.id})`)
+  await owner.delete(worker).where(sql`${worker.tenantId} IN (${t1.id}, ${t2.id})`)
+  await owner.delete(vendor).where(sql`${vendor.tenantId} IN (${t1.id}, ${t2.id})`)
+  await owner.delete(partyPii).where(sql`${partyPii.tenantId} IN (${t1.id}, ${t2.id})`)
   await owner.delete(idempotency).where(sql`${idempotency.tenantId} IN (${t1.id}, ${t2.id})`)
   await owner.delete(erpExport).where(sql`${erpExport.tenantId} IN (${t1.id}, ${t2.id})`)
   await owner.delete(eventLog).where(sql`${eventLog.tenantId} IN (${t1.id}, ${t2.id})`)

@@ -43,6 +43,13 @@
       "when": 1781566032589,
       "tag": "0005_outgoing_marauders",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781592174916,
+      "tag": "0006_marvelous_madelyne_pryor",
+      "breakpoints": true
     }
   ]
 }
