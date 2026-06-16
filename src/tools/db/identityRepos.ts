@@ -99,6 +99,7 @@ export function createIdentityRepo(db: Database) {
 
     // Tenant-scoped (call inside withTenantScope). Returns null when absent.
     async findActiveMembership(tx: Database, appUserId: string): Promise<MembershipRow | null> {
+      // @audit:unscoped read inside withTenantScope — RLS isolates membership by app.tenant_id
       const [row] = await tx
         .select()
         .from(membership)

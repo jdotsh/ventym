@@ -47,6 +47,7 @@ export function createAdminRepo() {
     },
 
     async findMember(tx: Database, membershipId: string): Promise<MemberView | null> {
+      // @audit:unscoped read inside withTenantScope — RLS isolates membership by app.tenant_id
       const [row] = await tx
         .select(memberColumns)
         .from(membership)

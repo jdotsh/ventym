@@ -16,7 +16,8 @@
     "gate:secrets": "bash scripts/secret-scan.sh",
     "gate:size": "tsx scripts/check-filesize.ts",
     "gate:discipline": "bash scripts/check-discipline.sh",
-    "ci": "bun run typecheck && bun run lint && bun run gate:rbac && bun run gate:mcp && bun run gate:secrets && bun run gate:size && bun run gate:discipline && bun run test",
+    "gate:tenant": "tsx scripts/check-tenant-predicate.ts",
+    "ci": "bun run typecheck && bun run lint && bun run gate:rbac && bun run gate:mcp && bun run gate:secrets && bun run gate:size && bun run gate:discipline && bun run gate:tenant && bun run test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx db/seed.ts"

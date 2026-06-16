@@ -20,6 +20,7 @@ jobs:
       - run: bun run gate:secrets # no committed credentials
       - run: bun run gate:size # no source file over the 250-line hard cap
       - run: bun run gate:discipline # no process.env/console/pgEnum/any in app code
+      - run: bun run gate:tenant # every repo read is tenant-scoped (AST) or waived
       - run: bun run test
 
   # Integration: the dual-surface write path against a REAL Postgres as the
