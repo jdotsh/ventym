@@ -8,9 +8,24 @@ import * as schema from '../db/schema'
 // Accepts both the root client and a transaction (repos work with either).
 export type Database = PgDatabase<PostgresJsQueryResultHKT, typeof schema>
 
+export type OpenDb = { db: Database; close: () => Promise<void> }
+
+/**
+ * Open a connection for ONE request. Cloudflare Workers forbids reusing an I/O
+ * object (the DB socket) created in one request from another, so a cached
+ * cross-request connection throws "Cannot perform I/O on behalf of a different
+ * request". The app therefore opens a fresh max:1 connection per request and closes
+ * it after the response. Deployed envs front this with Hyperdrive (edge pooling),
+ * so the per-request open is cheap.
+ */
+export function openDatabase(connectionString: string, max = 1): OpenDb {
+  const client = postgres(connectionString, { max, prepare: false })
+  return { db: drizzle(client, { schema }), close: () => client.end({ timeout: 5 }).catch(() => undefined) }
+}
+
+/** Long-lived pool for scripts (migrate / seed / scheduled) where the process owns it. */
 export function createDatabase(connectionString: string): Database {
-  const client = postgres(connectionString, { max: 5, prepare: false })
-  return drizzle(client, { schema })
+  return openDatabase(connectionString, 5).db
 }
 
 /**

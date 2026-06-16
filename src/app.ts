@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { parseConfig, type AppConfig } from '../config/env'
-import { assertRlsEnforced, createDatabase, type Database } from '../config/db'
+import { assertRlsEnforced, openDatabase } from '../config/db'
 import type { AppEnv, WorkerEnv } from '../config/bindings'
 import { createWorkosClient, type WorkosClient } from '@/tools/workos/client'
 import { createAgentVerifier, type AgentVerifier } from '@/tools/workos/agentAuth'
@@ -28,9 +28,9 @@ import { logger, serializeError } from '@/utils/logger'
 import { appErrorToProblem, problemResponse } from '@/utils/problemResponse'
 import { isAppError } from '@/types/errors'
 
-// Resolve config + DB + WorkOS once per isolate, not per request.
+// Config + WorkOS are plain objects — safe to cache per isolate. The DB connection
+// is NOT (it's a per-request I/O object in Workers), so it is opened per request.
 let cachedConfig: AppConfig | undefined
-let cachedDb: Database | undefined
 let cachedWorkos: WorkosClient | undefined
 let cachedAgentVerifier: AgentVerifier | undefined
 let rlsGuard: Promise<void> | undefined // fail-closed RLS-role check, once per isolate
@@ -52,8 +52,7 @@ const resolveAgentVerifier = (config: AppConfig): AgentVerifier =>
     audience: config.WORKOS_CLIENT_ID,
   }))
 
-function resolveDb(env: WorkerEnv, config: AppConfig): Database {
-  if (cachedDb) return cachedDb
+function connectionStringFor(env: WorkerEnv, config: AppConfig): string {
   // Deployed envs use Hyperdrive (→ on-prem via Tunnel). Local dev connects
   // directly: the simulated Hyperdrive proxy can't reach Docker Postgres.
   const connectionString =
@@ -61,7 +60,7 @@ function resolveDb(env: WorkerEnv, config: AppConfig): Database {
       ? config.DATABASE_URL
       : (env.HYPERDRIVE?.connectionString ?? config.DATABASE_URL)
   if (!connectionString) throw new Error('Missing HYPERDRIVE binding or DATABASE_URL')
-  return (cachedDb = createDatabase(connectionString))
+  return connectionString
 }
 
 /** Builds the Hono app. Middleware order is the request "walls". */
@@ -71,13 +70,22 @@ export function createApp(): Hono<AppEnv> {
   app.use('*', createTraceId()) // FIRST — every log line correlates by trace id
   app.use('*', async (c, next) => {
     const config = resolveConfig(c.env)
-    const db = resolveDb(c.env, config)
+    const { db, close } = openDatabase(connectionStringFor(c.env, config)) // per request (Workers I/O rule)
     c.set('config', config)
     c.set('db', db)
     c.set('workos', resolveWorkos(config))
     c.set('agentVerifier', resolveAgentVerifier(config))
     await (rlsGuard ??= assertRlsEnforced(db)) // boot-fail if the app role bypasses RLS
-    await next()
+    try {
+      await next()
+    } finally {
+      // Close after the response — never hold a socket across requests.
+      try {
+        c.executionCtx.waitUntil(close())
+      } catch {
+        await close()
+      }
+    }
   })
   app.use('*', createSecurityHeaders())
   app.use('*', createRequestTiming())
