@@ -81,6 +81,8 @@ function fakeStore(rate: string | null = '500.0000') {
           updatedAt: new Date(),
         }),
       ),
+    listByTenant: async (_tx, tenantId, limit) =>
+      [...sheets.values()].filter((s) => s.tenantId === tenantId).slice(0, limit),
     findById: async (_tx, tenantId, id) => {
       const s = sheets.get(id)
       return s && s.tenantId === tenantId ? s : null

@@ -172,6 +172,15 @@ export async function transitionTimesheet(
   })
 }
 
+/** List timesheets for the caller's tenant, newest first (the approval queue). */
+export async function listTimesheets(
+  ctx: SessionContext,
+  deps: TimesheetDeps,
+  limit = 100,
+): Promise<TimesheetRow[]> {
+  return deps.withTenantScope(scopeOf(ctx), (tx) => deps.repo.listByTenant(tx, ctx.tenantId, limit))
+}
+
 /** Read one timesheet by id, tenant-scoped. */
 export async function getTimesheet(
   ctx: SessionContext,

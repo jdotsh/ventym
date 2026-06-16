@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import type { Database } from '../../../config/db'
 import {
   eventLog,
@@ -43,6 +43,16 @@ export function createTimesheetRepo(db: Database) {
 
     async insertLines(tx: Database, values: (typeof timesheetLine.$inferInsert)[]): Promise<TimesheetLineRow[]> {
       return tx.insert(timesheetLine).values(values).returning()
+    },
+
+    // Tenant-scoped list, newest first (the approval queue view).
+    async listByTenant(tx: Database, tenantId: string, limit: number): Promise<TimesheetRow[]> {
+      return tx
+        .select()
+        .from(timesheet)
+        .where(eq(timesheet.tenantId, tenantId))
+        .orderBy(desc(timesheet.createdAt))
+        .limit(limit)
     },
 
     async findById(tx: Database, tenantId: string, id: string): Promise<TimesheetRow | null> {
