@@ -1,9 +1,10 @@
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import type { Database } from '../../../config/db'
 import { appUser, auditLog, membership, tenantConnection, type ActorKind, type TenantRole } from '../../../db/schema'
 
 export type MemberView = {
   membershipId: string
+  appUserId: string
   email: string
   displayName: string | null
   roles: TenantRole[]
@@ -27,6 +28,7 @@ export type AdminRepo = ReturnType<typeof createAdminRepo>
 export function createAdminRepo() {
   const memberColumns = {
     membershipId: membership.id,
+    appUserId: membership.appUserId,
     email: appUser.email,
     displayName: appUser.displayName,
     roles: membership.roles,
@@ -65,6 +67,28 @@ export function createAdminRepo() {
         .where(and(eq(membership.id, input.membershipId), eq(membership.version, input.expectedVersion)))
         .returning({ id: membership.id })
       return updated.length > 0
+    },
+
+    // Suspend / reactivate a membership — version-checked (lost-update safe).
+    async setActive(
+      tx: Database,
+      input: { membershipId: string; isActive: boolean; expectedVersion: number },
+    ): Promise<boolean> {
+      const updated = await tx
+        .update(membership)
+        .set({ isActive: input.isActive, version: input.expectedVersion + 1, updatedAt: new Date() })
+        .where(and(eq(membership.id, input.membershipId), eq(membership.version, input.expectedVersion)))
+        .returning({ id: membership.id })
+      return updated.length > 0
+    },
+
+    // Active ADMINs in the tenant — the last-admin lockout guard reads this.
+    async countActiveAdmins(tx: Database, tenantId: string): Promise<number> {
+      const rows = await tx
+        .select({ id: membership.id })
+        .from(membership)
+        .where(and(eq(membership.tenantId, tenantId), eq(membership.isActive, true), sql`'ADMIN' = ANY(${membership.roles})`))
+      return rows.length
     },
 
     async findWorkosOrgId(tx: Database, tenantId: string): Promise<string | null> {

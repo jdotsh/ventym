@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import type { AppEnv } from '../../config/bindings'
 import { buildAdminDeps } from '@/services/admin/deps'
-import { listMembers, setMemberRoles, setRolesSchema, ssoPortalLink, type AdminActor } from '@/services/admin/service'
+import { listMembers, setMemberActive, setMemberRoles, setActiveSchema, setRolesSchema, ssoPortalLink, type AdminActor } from '@/services/admin/service'
 import { adminPage } from '@/views/pages/admin'
 import { resolveLocale } from '@/views/i18n'
 import { logger, serializeError } from '@/utils/logger'
@@ -35,6 +35,16 @@ export const adminRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.redirect('/admin/users?flash=invalid')
     const result = await setMemberRoles(actor, c.req.param('id'), parsed.data, buildAdminDeps(c.get('db'), c.get('workos')))
     return c.redirect(`/admin/users?flash=${result.type === 'ok' ? 'ok' : result.type}`)
+  })
+
+  .post('/admin/users/:id/active', async (c) => {
+    const actor = actorOf(c)
+    if (!actor) return c.redirect('/login')
+    const form = await c.req.parseBody()
+    const parsed = setActiveSchema.safeParse({ isActive: form['isActive'], expectedVersion: form['version'] })
+    if (!parsed.success) return c.redirect('/admin/users?flash=invalid')
+    const result = await setMemberActive(actor, c.req.param('id'), parsed.data, buildAdminDeps(c.get('db'), c.get('workos')))
+    return c.redirect(`/admin/users?flash=${result.type === 'ok' ? 'active_ok' : result.type}`)
   })
 
   .post('/admin/sso/portal', async (c) => {

@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { Database } from '../config/db'
 import type { MemberView } from '@/tools/db/adminRepos'
-import { setMemberRoles, type AdminDeps } from '@/services/admin/service'
+import { setMemberActive, setMemberRoles, type AdminDeps } from '@/services/admin/service'
 
 const actor = { tenantId: 't_1', userId: 'u_1', sessionId: 's_1' }
 
 const existing: MemberView = {
   membershipId: 'm_1',
+  appUserId: 'u_2', // not the actor — suspendable
   email: 'a@acme.test',
   displayName: null,
   roles: ['MEMBER'],
@@ -30,6 +31,8 @@ function deps(repo: Partial<AdminDeps['repo']>, audit: { calls: number }): Admin
     listMembers: async () => [],
     findMember: async () => existing,
     setRoles: async () => true,
+    setActive: async () => true,
+    countActiveAdmins: async () => 2,
     findWorkosOrgId: async () => null,
     writeAudit: async () => {
       audit.calls += 1
@@ -66,5 +69,36 @@ describe('setMemberRoles (optimistic concurrency + audit)', () => {
       deps({ findMember: async () => null }, { calls: 0 }),
     )
     expect(result).toEqual({ type: 'notFound' })
+  })
+})
+
+describe('setMemberActive (suspend/reactivate — Athena safeguards, vms style)', () => {
+  it('suspends a member and writes one audit row', async () => {
+    const audit = { calls: 0 }
+    const r = await setMemberActive(actor, 'm_1', { isActive: false, expectedVersion: 3 }, deps({}, audit))
+    expect(r).toEqual({ type: 'ok' })
+    expect(audit.calls).toBe(1)
+  })
+
+  it('refuses to suspend your own membership (no self-lockout)', async () => {
+    const self: MemberView = { ...existing, appUserId: 'u_1' }
+    const r = await setMemberActive(actor, 'm_1', { isActive: false, expectedVersion: 3 }, deps({ findMember: async () => self }, { calls: 0 }))
+    expect(r).toEqual({ type: 'selfSuspend' })
+  })
+
+  it('refuses to suspend the last active ADMIN (no tenant lockout)', async () => {
+    const admin: MemberView = { ...existing, roles: ['ADMIN'] }
+    const r = await setMemberActive(
+      actor,
+      'm_1',
+      { isActive: false, expectedVersion: 3 },
+      deps({ findMember: async () => admin, countActiveAdmins: async () => 1 }, { calls: 0 }),
+    )
+    expect(r).toEqual({ type: 'lastAdmin' })
+  })
+
+  it('returns conflict when the version moved', async () => {
+    const r = await setMemberActive(actor, 'm_1', { isActive: false, expectedVersion: 3 }, deps({ setActive: async () => false }, { calls: 0 }))
+    expect(r).toEqual({ type: 'conflict' })
   })
 })

@@ -19,6 +19,24 @@ function roleEditor(member: MemberView, locale: Locale): Html {
   </form>`
 }
 
+// Suspend (active members) / reactivate (suspended) — the leaver control. The
+// hidden `version` makes it lost-update safe, like the role editor.
+function activeCell(member: MemberView, locale: Locale): Html {
+  const badge = member.isActive
+    ? html`<span class="badge badge--ok">${t(locale, 'admin.active')}</span>`
+    : html`<span class="badge">${t(locale, 'admin.suspended')}</span>`
+  return html`<div class="flex-wrap">
+    ${badge}
+    <form method="post" action="/admin/users/${member.membershipId}/active">
+      <input type="hidden" name="isActive" value="${member.isActive ? 'false' : 'true'}" />
+      <input type="hidden" name="version" value="${String(member.version)}" />
+      <button class="btn btn--ghost btn--sm" type="submit">
+        ${t(locale, member.isActive ? 'admin.suspend' : 'admin.reactivate')}
+      </button>
+    </form>
+  </div>`
+}
+
 export function adminPage(props: {
   locale: Locale
   email: string
@@ -26,7 +44,7 @@ export function adminPage(props: {
   flash?: string
 }): Html {
   const { locale, flash } = props
-  const flashClass = flash === 'ok' ? 'alert' : 'alert alert--danger'
+  const flashClass = flash === 'ok' || flash === 'active_ok' ? 'alert' : 'alert alert--danger'
   return baseLayout({
     title: `${t(locale, 'admin.title')} · ${t(locale, 'app.name')}`,
     locale,
@@ -45,6 +63,7 @@ export function adminPage(props: {
               <tr>
                 <th>${t(locale, 'admin.user')}</th>
                 <th>${t(locale, 'admin.roles')}</th>
+                <th>${t(locale, 'admin.status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -52,6 +71,7 @@ export function adminPage(props: {
                 (m) => html`<tr>
                   <td>${m.displayName ?? m.email}<div class="muted small">${m.email}</div></td>
                   <td>${roleEditor(m, locale)}</td>
+                  <td>${activeCell(m, locale)}</td>
                 </tr>`,
               )}
             </tbody>

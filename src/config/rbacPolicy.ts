@@ -53,6 +53,7 @@ export const RBAC_POLICY: Readonly<Record<string, PolicyEntry>> = {
   'POST /api/v1/assignments/:id/end': roles('ADMIN', 'MANAGER'),
   'GET /admin/users': roles('ADMIN'),
   'POST /admin/users/:id/roles': roles('ADMIN'),
+  'POST /admin/users/:id/active': roles('ADMIN'), // suspend / reactivate a membership
   'POST /admin/sso/portal': roles('ADMIN'),
 }
 
