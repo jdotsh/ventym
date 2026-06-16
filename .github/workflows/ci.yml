@@ -18,6 +18,7 @@ jobs:
       - run: bun run gate:rbac # every route is governed by RBAC_POLICY
       - run: bun run gate:mcp # every MCP tool derives RBAC from RBAC_POLICY
       - run: bun run gate:secrets # no committed credentials
+      - run: bun run gate:size # no source file over the 250-line hard cap
       - run: bun run test
 
   # Integration: the dual-surface write path against a REAL Postgres as the
