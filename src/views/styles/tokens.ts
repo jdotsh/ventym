@@ -24,4 +24,16 @@ export const TOKENS = `:root{
   --font:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
   --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
   --shadow:0 1px 2px rgba(0,0,0,.06);
+}
+/* Dark mode — the institutional working mode (toggled via the profile menu). */
+html[data-theme=dark]{
+  --navy:oklch(70% 0.155 264); --navy-600:oklch(78% 0.16 264); --navy-bright:oklch(78% 0.16 264);
+  --navy-50:color-mix(in srgb,var(--navy) 18%,transparent);
+  --surface:oklch(13% 0.008 264); --raised:oklch(17% 0.010 264); --surface-warm:oklch(20% 0.012 264);
+  --border:oklch(30% 0.012 264); --border-strong:oklch(42% 0.018 264);
+  --ink:oklch(94% 0.005 264); --ink-soft:oklch(76% 0.005 264); --ink-dim:oklch(60% 0.005 264);
+  --ok:oklch(80% 0.16 142); --ok-bg:color-mix(in srgb,var(--ok) 16%,transparent);
+  --warn:oklch(82% 0.20 75); --warn-bg:color-mix(in srgb,var(--warn) 16%,transparent);
+  --danger:oklch(72% 0.20 26); --danger-bg:color-mix(in srgb,var(--danger) 16%,transparent);
+  --shadow:0 1px 2px rgba(0,0,0,.4);
 }`

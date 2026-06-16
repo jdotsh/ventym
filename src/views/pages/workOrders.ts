@@ -22,8 +22,11 @@ export function workOrdersPage(props: { locale: Locale; session: SessionContext;
         <h1>${t(locale, 'wo.title')}</h1>
         ${workOrders.length === 0
           ? html`<div class="card muted">${t(locale, 'wo.empty')}</div>`
-          : html`<div class="card">
-              <table class="table">
+          : html`<div class="dt-filter">
+              <input type="text" data-filter="wo-table" placeholder="${t(locale, 'wo.filter')}" aria-label="${t(locale, 'wo.filter')}" />
+            </div>
+            <div class="card">
+              <table id="wo-table" class="table">
                 <thead>
                   <tr>
                     <th>${t(locale, 'wo.code')}</th>

@@ -1,6 +1,7 @@
 import { html, type Html } from '../html'
 import type { Locale } from '../i18n'
 import { CSS_VERSION } from '../styles'
+import { JS_VERSION } from '../scripts/app'
 
 /** The HTML shell. `body` is already-escaped HTML built by a page. */
 export function baseLayout(props: { title: string; locale: Locale; body: Html }): Html {
@@ -19,6 +20,7 @@ export function baseLayout(props: { title: string; locale: Locale; body: Html })
   </head>
   <body>
     ${props.body}
+    <script defer src="/assets/app.js?v=${JS_VERSION}"></script>
   </body>
 </html>`
 }

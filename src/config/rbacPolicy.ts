@@ -17,6 +17,7 @@ export const RBAC_POLICY: Readonly<Record<string, PolicyEntry>> = {
   'GET /': PUBLIC,
   'GET /login': PUBLIC,
   'GET /assets/app.css': PUBLIC,
+  'GET /assets/app.js': PUBLIC,
   'GET /health': PUBLIC,
   'GET /health/ready': PUBLIC,
   'GET /api/v1/openapi.json': PUBLIC, // the contract SSOT (SDK/MCP/humans)

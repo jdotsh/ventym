@@ -14,6 +14,7 @@ import { listVendors, listWorkers } from '@/services/staffing/service'
 import { randomId } from '@/utils/ids'
 import { resolveLocale } from '@/views/i18n'
 import { APP_CSS } from '@/views/styles'
+import { APP_JS } from '@/views/scripts/app'
 
 // A timesheet transition error → a flash key the page can localize.
 const tsFlash = (kind: string): string => kind
@@ -26,6 +27,13 @@ export const viewRoutes = new Hono<AppEnv>()
     c.body(APP_CSS, 200, {
       'Content-Type': 'text/css; charset=utf-8',
       // Local dev: never cache, so style edits show on a normal refresh. Prod: 1h.
+      'Cache-Control': c.get('config').ENVIRONMENT === 'local' ? 'no-store' : 'public, max-age=3600',
+    }),
+  )
+
+  .get('/assets/app.js', (c) =>
+    c.body(APP_JS, 200, {
+      'Content-Type': 'text/javascript; charset=utf-8',
       'Cache-Control': c.get('config').ENVIRONMENT === 'local' ? 'no-store' : 'public, max-age=3600',
     }),
   )

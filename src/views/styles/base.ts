@@ -33,6 +33,15 @@ code,.mono{font-family:var(--mono);font-size:.9em;font-variant-numeric:tabular-n
   border-radius:var(--r-md);color:var(--ink-soft);font-weight:500;font-size:var(--fs-body);transition:background .14s,color .14s}
 .navlink:hover{background:var(--surface);color:var(--ink);text-decoration:none}
 .navlink--active{background:var(--navy-50);color:var(--navy);font-weight:600}
+.navlink__icon{width:20px;flex:none;text-align:center;font-size:1rem;color:var(--ink-dim)}
+.navlink--active .navlink__icon{color:var(--navy)}
+.navlink__label{white-space:nowrap;overflow:hidden}
+/* ── Collapsed rail (toggled by /assets/app.js → html.is-nav-collapsed) ── */
+.sidenav,.topbar,.container{transition:width .18s ease,margin-left .18s ease}
+html.is-nav-collapsed{--nav-w:64px}
+html.is-nav-collapsed .navlink__label{opacity:0;width:0}
+html.is-nav-collapsed .navlink,html.is-nav-collapsed .sidenav__brand{justify-content:center;padding:0;gap:0}
+html.is-nav-collapsed .sidenav{padding:var(--sp-4) var(--sp-2)}
 /* ── Top header bar (sticky, right of the sidebar) ── */
 .topbar{position:sticky;top:0;z-index:15;margin-left:var(--nav-w);height:52px;
   display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4);
