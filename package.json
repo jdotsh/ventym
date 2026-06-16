@@ -17,10 +17,11 @@
     "gate:size": "tsx scripts/check-filesize.ts",
     "gate:discipline": "bash scripts/check-discipline.sh",
     "gate:tenant": "tsx scripts/check-tenant-predicate.ts",
-    "ci": "bun run typecheck && bun run lint && bun run gate:rbac && bun run gate:mcp && bun run gate:secrets && bun run gate:size && bun run gate:discipline && bun run gate:tenant && bun run test",
+    "ci": "bun run typecheck && bun run lint && bun run gate:rbac && bun run gate:mcp && bun run gate:secrets && bun run gate:size && bun run gate:discipline && bun run gate:tenant && bun run gate:rls && bun run test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx db/seed.ts"
+    "db:seed": "tsx db/seed.ts",
+    "gate:rls": "tsx scripts/check-rls-coverage.ts"
   },
   "dependencies": {
     "@workos-inc/node": "10.2.0",
