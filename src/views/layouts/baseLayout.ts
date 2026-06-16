@@ -1,5 +1,6 @@
 import { html, type Html } from '../html'
 import type { Locale } from '../i18n'
+import { CSS_VERSION } from '../styles'
 
 /** The HTML shell. `body` is already-escaped HTML built by a page. */
 export function baseLayout(props: { title: string; locale: Locale; body: Html }): Html {
@@ -14,7 +15,7 @@ export function baseLayout(props: { title: string; locale: Locale; body: Html })
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap"
     />
-    <link rel="stylesheet" href="/assets/app.css" />
+    <link rel="stylesheet" href="/assets/app.css?v=${CSS_VERSION}" />
   </head>
   <body>
     ${props.body}
