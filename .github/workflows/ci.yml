@@ -22,6 +22,7 @@ jobs:
       - run: bun run gate:discipline # no process.env/console/pgEnum/any in app code
       - run: bun run gate:tenant # every repo read is tenant-scoped (AST) or waived
       - run: bun run gate:rls # every tenant-scoped table has RLS enabled
+      - run: bun run gate:layers # imports flow down the layer stack; no cycles
       - run: bun run test
 
   # Integration: the dual-surface write path against a REAL Postgres as the
