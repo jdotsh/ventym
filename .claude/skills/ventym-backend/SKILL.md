@@ -5,8 +5,9 @@ description: Use when adding or changing any route, service, repo, middleware, o
 
 # ventym backend skill
 
-SSOT for the rules is `ARCHITECTURE.md`. The app is a layered modular monolith on
-Cloudflare Workers + Hono. Extend the existing seams; never add a parallel pattern.
+**Binding rules: `docs/RULES.md`** (cite R-numbers in PRs/review). Orientation:
+**ventym-nav** skill + `ARCHITECTURE.md`. The app is a layered modular monolith on
+Cloudflare Workers + Hono. Extend the existing seams; never add a parallel pattern (R-7).
 
 ## The seam law (violations fail review)
 
