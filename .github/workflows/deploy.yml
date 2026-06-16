@@ -1,0 +1,56 @@
+name: Deploy
+
+# Migrations-before-code, per environment. dev auto-deploys; integration on a
+# release branch; production is manual + requires a tag. Each env has its own Neon
+# instance (owner URL for migrations) and Cloudflare bindings (Hyperdrive/KV).
+#
+# Required GitHub secrets:
+#   CLOUDFLARE_API_TOKEN
+#   DB_OWNER_URL_DEV / _INT / _PROD   (postgres://vms:…@<neon>/vms — the OWNER role)
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options: [integration, production]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+
+      # Gate: the whole CI suite must pass before anything ships.
+      - run: bun run ci
+
+      - name: Resolve target env
+        id: env
+        run: echo "name=${{ github.event_name == 'push' && 'dev' || inputs.environment }}" >> "$GITHUB_OUTPUT"
+
+      # Migrations FIRST, as the OWNER role (the app connects as non-owner vms_app).
+      - name: Migrate (as owner)
+        env:
+          DATABASE_URL: ${{ steps.env.outputs.name == 'production' && secrets.DB_OWNER_URL_PROD || steps.env.outputs.name == 'integration' && secrets.DB_OWNER_URL_INT || secrets.DB_OWNER_URL_DEV }}
+        run: bun run db:migrate
+
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: bunx wrangler deploy --env ${{ steps.env.outputs.name }}
+
+      # Post-deploy smoke: /health/ready must be 200. (Wire rollback to your infra.)
+      - name: Smoke test
+        run: |
+          url="https://vms-mvp-${{ steps.env.outputs.name }}.<your-account>.workers.dev/health/ready"
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)
+            [ "$code" = "200" ] && echo "ready ✓" && exit 0
+            sleep 3
+          done
+          echo "smoke failed — investigate / roll back" && exit 1

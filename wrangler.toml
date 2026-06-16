@@ -22,3 +22,35 @@ id = "rate_limit_kv_placeholder"
 
 [vars]
 ENVIRONMENT = "local"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Deployed environments. Each has its OWN Neon instance (via its own Hyperdrive
+# config) + KV + SLI dataset. Create resources, then replace the REPLACE_* ids:
+#   wrangler hyperdrive create vms-<env> --connection-string="postgres://…neon…"
+#   wrangler kv namespace create RATE_LIMIT --env <env>
+# Secrets are NEVER here — set per env:
+#   wrangler secret put WORKOS_API_KEY --env <env>   (+ WORKOS_CLIENT_ID,
+#   WORKOS_REDIRECT_URI, SESSION_SECRET, CONNECTION_SECRETS_KEY)
+# Smart Placement colocates the Worker near Neon (latency).
+# ─────────────────────────────────────────────────────────────────────────────
+
+[env.dev]
+vars = { ENVIRONMENT = "dev" }
+placement = { mode = "smart" }
+hyperdrive = [{ binding = "HYPERDRIVE", id = "REPLACE_dev_hyperdrive_id" }]
+kv_namespaces = [{ binding = "RATE_LIMIT", id = "REPLACE_dev_kv_id" }]
+analytics_engine_datasets = [{ binding = "SLI", dataset = "vms_sli_dev" }]
+
+[env.integration]
+vars = { ENVIRONMENT = "int" }
+placement = { mode = "smart" }
+hyperdrive = [{ binding = "HYPERDRIVE", id = "REPLACE_int_hyperdrive_id" }]
+kv_namespaces = [{ binding = "RATE_LIMIT", id = "REPLACE_int_kv_id" }]
+analytics_engine_datasets = [{ binding = "SLI", dataset = "vms_sli_int" }]
+
+[env.production]
+vars = { ENVIRONMENT = "production" }
+placement = { mode = "smart" }
+hyperdrive = [{ binding = "HYPERDRIVE", id = "REPLACE_prod_hyperdrive_id" }]
+kv_namespaces = [{ binding = "RATE_LIMIT", id = "REPLACE_prod_kv_id" }]
+analytics_engine_datasets = [{ binding = "SLI", dataset = "vms_sli_production" }]
