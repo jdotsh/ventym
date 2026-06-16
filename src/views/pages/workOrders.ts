@@ -17,7 +17,7 @@ export function workOrdersPage(props: { locale: Locale; session: SessionContext;
   return baseLayout({
     title: `${t(locale, 'wo.title')} · ${t(locale, 'app.name')}`,
     locale,
-    body: html`${appHeader({ locale, email: session.email, showAdmin: session.roles.includes('ADMIN') })}
+    body: html`${appHeader({ locale, email: session.email, showAdmin: session.roles.includes('ADMIN'), active: 'work-orders' })}
       <main class="container stack">
         <h1>${t(locale, 'wo.title')}</h1>
         ${workOrders.length === 0

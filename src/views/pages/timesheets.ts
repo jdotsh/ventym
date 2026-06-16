@@ -38,7 +38,7 @@ export function timesheetsPage(props: {
   return baseLayout({
     title: `${t(locale, 'ts.title')} · ${t(locale, 'app.name')}`,
     locale,
-    body: html`${appHeader({ locale, email: session.email, showAdmin: session.roles.includes('ADMIN') })}
+    body: html`${appHeader({ locale, email: session.email, showAdmin: session.roles.includes('ADMIN'), active: 'timesheets' })}
       <main class="container stack">
         <h1>${t(locale, 'ts.title')}</h1>
         ${flash ? html`<p class="${flashClass}">${t(locale, `ts.flash.${flash}`)}</p>` : ''}

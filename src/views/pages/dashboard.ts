@@ -10,7 +10,7 @@ export function dashboardPage(props: { locale: Locale; session: SessionContext }
   return baseLayout({
     title: `${t(locale, 'dash.title')} · ${t(locale, 'app.name')}`,
     locale,
-    body: html`${appHeader({ locale, email: session.email, showAdmin: session.roles.includes('ADMIN') })}
+    body: html`${appHeader({ locale, email: session.email, showAdmin: session.roles.includes('ADMIN'), active: 'dashboard' })}
       <main class="container stack">
         <h1>${t(locale, 'dash.welcome')}, ${who}</h1>
         <div class="card">

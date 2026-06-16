@@ -48,7 +48,7 @@ export function adminPage(props: {
   return baseLayout({
     title: `${t(locale, 'admin.title')} · ${t(locale, 'app.name')}`,
     locale,
-    body: html`${appHeader({ locale, email: props.email, showAdmin: true })}
+    body: html`${appHeader({ locale, email: props.email, showAdmin: true, active: 'admin' })}
       <main class="container stack">
         <div class="spread">
           <h1>${t(locale, 'admin.title')}</h1>

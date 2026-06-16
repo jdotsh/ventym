@@ -75,7 +75,7 @@ export function staffingPage(props: {
   return baseLayout({
     title: `${t(locale, 'staff.title')} · ${t(locale, 'app.name')}`,
     locale,
-    body: html`${appHeader({ locale, email: session.email, showAdmin: session.roles.includes('ADMIN') })}
+    body: html`${appHeader({ locale, email: session.email, showAdmin: session.roles.includes('ADMIN'), active: 'staffing' })}
       <main class="container stack">
         <h1>${t(locale, 'staff.title')}</h1>
         <h2>${t(locale, 'staff.vendors')}</h2>
