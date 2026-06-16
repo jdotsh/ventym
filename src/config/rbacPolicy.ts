@@ -33,6 +33,7 @@ export const RBAC_POLICY: Readonly<Record<string, PolicyEntry>> = {
   'GET /timesheets': AUTHENTICATED, // the approval queue view
   'POST /timesheets/:id/approve': roles('ADMIN', 'MANAGER'), // referent approves (SoD enforced in the service)
   'POST /timesheets/:id/reject': roles('ADMIN', 'MANAGER'),
+  'GET /staffing': AUTHENTICATED, // vendors + workers list view
   // Work Order JSON API — the technical referent (MANAGER) drives the workflow.
   'POST /api/v1/work-orders': roles('ADMIN', 'MANAGER'),
   'POST /api/v1/work-orders/:id/transitions': roles('ADMIN', 'MANAGER'),

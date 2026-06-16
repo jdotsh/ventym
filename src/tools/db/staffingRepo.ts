@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import type { Database } from '../../../config/db'
 import {
   assignment,
@@ -20,6 +20,16 @@ export type StaffingRepo = ReturnType<typeof createStaffingRepo>
 // A worker row joined with its person-PII (resolved in-tenant from sensitive.party_pii).
 export type WorkerWithPii = WorkerRow & { name: string | null; email: string | null }
 
+// A worker list row — display fields only (PII name resolved in-tenant, vendor joined).
+export type WorkerListItem = {
+  id: string
+  name: string | null
+  vendorName: string
+  skillCode: string | null
+  seniorityCode: string | null
+  isActive: boolean
+}
+
 export function createStaffingRepo(db: Database) {
   void db
   return {
@@ -27,6 +37,26 @@ export function createStaffingRepo(db: Database) {
     async insertVendor(tx: Database, values: typeof vendor.$inferInsert): Promise<VendorRow | null> {
       const [row] = await tx.insert(vendor).values(values).onConflictDoNothing().returning()
       return row ?? null
+    },
+    async listVendors(tx: Database, tenantId: string, limit: number): Promise<VendorRow[]> {
+      return tx.select().from(vendor).where(eq(vendor.tenantId, tenantId)).orderBy(asc(vendor.code)).limit(limit)
+    },
+    async listWorkers(tx: Database, tenantId: string, limit: number): Promise<WorkerListItem[]> {
+      return tx
+        .select({
+          id: worker.id,
+          name: partyPii.name,
+          vendorName: vendor.name,
+          skillCode: worker.skillCode,
+          seniorityCode: worker.seniorityCode,
+          isActive: worker.isActive,
+        })
+        .from(worker)
+        .leftJoin(partyPii, eq(worker.partyId, partyPii.partyId))
+        .innerJoin(vendor, eq(worker.vendorId, vendor.id))
+        .where(eq(worker.tenantId, tenantId))
+        .orderBy(asc(vendor.name))
+        .limit(limit)
     },
     async findVendorById(tx: Database, tenantId: string, id: string): Promise<VendorRow | null> {
       const [row] = await tx

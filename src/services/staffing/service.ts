@@ -1,6 +1,6 @@
 import type { Database, TenantScope } from '../../../config/db'
 import type { ActorKind, AssignmentRow, VendorRow } from '../../../db/schema'
-import type { StaffingRepo, WorkerWithPii } from '@/tools/db/staffingRepo'
+import type { StaffingRepo, WorkerListItem, WorkerWithPii } from '@/tools/db/staffingRepo'
 import { err, ok, type Result } from '@/utils/result'
 import type { SessionContext } from '@/services/identity/service'
 import { nextStatus } from './machine'
@@ -56,6 +56,16 @@ export async function createVendor(
 
 export async function getVendor(ctx: SessionContext, id: string, deps: StaffingDeps): Promise<VendorRow | null> {
   return deps.withTenantScope(scopeOf(ctx), (tx) => deps.repo.findVendorById(tx, ctx.tenantId, id))
+}
+
+/** List vendors for the caller's tenant (alpha by code). */
+export async function listVendors(ctx: SessionContext, deps: StaffingDeps, limit = 100): Promise<VendorRow[]> {
+  return deps.withTenantScope(scopeOf(ctx), (tx) => deps.repo.listVendors(tx, ctx.tenantId, limit))
+}
+
+/** List workers for the caller's tenant, with PII name resolved in-tenant. */
+export async function listWorkers(ctx: SessionContext, deps: StaffingDeps, limit = 100): Promise<WorkerListItem[]> {
+  return deps.withTenantScope(scopeOf(ctx), (tx) => deps.repo.listWorkers(tx, ctx.tenantId, limit))
 }
 
 // ── Worker (PII isolated to sensitive.party_pii) ──────────────────────────────

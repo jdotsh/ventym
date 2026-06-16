@@ -8,6 +8,7 @@ export function appHeader(props: { locale: Locale; email: string; showAdmin?: bo
       <a class="brand" href="/dashboard">⬡ ${t(props.locale, 'app.name')}</a>
       <a class="muted small" href="/work-orders">${t(props.locale, 'nav.workOrders')}</a>
       <a class="muted small" href="/timesheets">${t(props.locale, 'nav.timesheets')}</a>
+      <a class="muted small" href="/staffing">${t(props.locale, 'nav.staffing')}</a>
       ${props.showAdmin ? html`<a class="muted small" href="/admin/users">${t(props.locale, 'nav.admin')}</a>` : ''}
     </div>
     <div class="row">

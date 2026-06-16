@@ -4,10 +4,13 @@ import { dashboardPage } from '@/views/pages/dashboard'
 import { loginPage } from '@/views/pages/login'
 import { workOrdersPage } from '@/views/pages/workOrders'
 import { timesheetsPage } from '@/views/pages/timesheets'
+import { staffingPage } from '@/views/pages/staffing'
 import { buildWorkOrderDeps } from '@/services/workOrder/deps'
 import { listWorkOrders } from '@/services/workOrder/service'
 import { buildTimesheetDeps } from '@/services/timesheet/deps'
 import { listTimesheets, transitionTimesheet } from '@/services/timesheet/service'
+import { buildStaffingDeps } from '@/services/staffing/deps'
+import { listVendors, listWorkers } from '@/services/staffing/service'
 import { randomId } from '@/utils/ids'
 import { resolveLocale } from '@/views/i18n'
 import { APP_CSS } from '@/views/styles'
@@ -79,4 +82,12 @@ export const viewRoutes = new Hono<AppEnv>()
       buildTimesheetDeps(c.get('db'), 'human'),
     )
     return c.redirect(`/timesheets?flash=${result.ok ? 'ts_ok' : tsFlash(result.error.kind)}`)
+  })
+
+  .get('/staffing', async (c) => {
+    const session = c.get('session')
+    if (!session) return c.redirect('/login')
+    const deps = buildStaffingDeps(c.get('db'), 'human')
+    const [vendors, workers] = await Promise.all([listVendors(session, deps), listWorkers(session, deps)])
+    return c.html(staffingPage({ locale: resolveLocale(c.req.query('lang')), session, vendors, workers }))
   })

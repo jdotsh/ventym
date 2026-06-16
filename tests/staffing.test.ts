@@ -24,6 +24,8 @@ function fakeStaffing(opts: { lineDays?: string | null; allocated?: number; vend
   let n = 0
   const repo: StaffingRepo = {
     insertVendor: async () => null,
+    listVendors: async () => [],
+    listWorkers: async () => [],
     findVendorById: async (_tx, _t, id): Promise<VendorRow | null> =>
       opts.vendorExists === false ? null : { id, tenantId: 't1', version: 1, code: 'V', name: 'Vendor', vatNumber: null, status: 'ACTIVE', createdAt: new Date(), updatedAt: new Date() },
     insertPartyPii: async (_tx, i) => {
