@@ -1,23 +1,37 @@
-// Drift guard (mirrors gate:rbac): every MCP tool that mirrors an HTTP route MUST
-// resolve to an RBAC_POLICY entry — so MCP governance can never diverge from the
-// API. An MCP tool with a route absent from the policy fails the build.
+// Drift guards (mirror gate:rbac) — make "one service, three faces" true by
+// construction. Fails the build if:
+//   1. an MCP capability's route is absent from RBAC_POLICY (access drift), or
+//   2. a routed MCP tool isn't declared in the capability registry (i.e. someone
+//      hand-wrote a tool/schema instead of projecting it — contract drift).
 import { policyFor } from '../src/config/rbacPolicy'
+import { CAPABILITIES } from '../src/config/capabilities'
 import { TOOLS } from '../src/services/mcp/server'
 
-let missing = 0
-let routed = 0
-for (const tool of TOOLS) {
-  if (!tool.route) continue
-  routed++
-  const [method, path] = tool.route.split(' ')
+let failures = 0
+const fail = (msg: string) => {
+  console.error(`✗ ${msg}`)
+  failures++
+}
+
+const capNames = new Set<string>()
+for (const cap of CAPABILITIES) {
+  if (!cap.mcp) continue
+  capNames.add(cap.mcp.name)
+  const [method, path] = cap.route.split(' ')
   if (!method || !path || !policyFor(method, path)) {
-    console.error(`✗ MCP tool '${tool.name}' route '${tool.route}' has no RBAC_POLICY entry`)
-    missing++
+    fail(`capability '${cap.mcp.name}' route '${cap.route}' has no RBAC_POLICY entry`)
   }
 }
 
-if (missing > 0) {
-  console.error(`MCP coverage FAILED: ${missing} tool(s) ungoverned`)
+for (const tool of TOOLS) {
+  if (!tool.route) continue
+  if (!capNames.has(tool.name)) {
+    fail(`MCP tool '${tool.name}' is routed but not declared in CAPABILITIES (hand-written governance/schema)`)
+  }
+}
+
+if (failures > 0) {
+  console.error(`MCP coverage FAILED: ${failures} issue(s)`)
   process.exit(1)
 }
-console.log(`✓ MCP coverage — ${routed} routed tools, all governed by RBAC_POLICY (one SSOT)`)
+console.log(`✓ MCP coverage — ${capNames.size} capabilities, all governed by RBAC_POLICY; every routed tool is a registry projection`)

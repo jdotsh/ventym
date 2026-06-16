@@ -1,6 +1,12 @@
 import { z } from 'zod'
 import { ENGAGEMENT_TYPES, type WoLifecycleStatus } from '../../../db/schema'
-import type { WoTransition } from './machine'
+import { WO_TRANSITIONS, type WoTransition } from './machine'
+
+// The transition request body (the SSOT shared by the route + the capability registry).
+export const transitionWorkOrderBodySchema = z.object({
+  transition: z.enum(WO_TRANSITIONS),
+  expectedVersion: z.number().int().min(1),
+})
 
 // Zod is the SSOT: validate once at the boundary, trust inside. A line carries
 // NATIVE structured codes (role/seniority/category/geo) — never free text.

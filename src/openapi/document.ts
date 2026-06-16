@@ -1,22 +1,33 @@
+import { zodToJsonSchema } from 'zod-to-json-schema'
 import { RBAC_POLICY, type PolicyEntry } from '@/config/rbacPolicy'
+import { CAPABILITIES } from '@/config/capabilities'
 import { DOMAIN_REGISTRY } from '@/types/errorRegistry'
 import { isApiPath } from '@/utils/apiPaths'
 
 /**
- * OpenAPI 3.1 generated from the two SSOTs: RBAC_POLICY (paths + security) and
- * the error registry (the problem+json contract). Built early so every new API
- * route is born documented — and so it stays the MCP/SDK substrate. Request/
- * response body schemas (Zod → JSON Schema) attach per-endpoint as they land.
+ * OpenAPI 3.1 generated from the SSOTs: RBAC_POLICY (paths + security), the error
+ * registry (the problem+json contract), and the capability registry (request body
+ * schemas, Zod → JSON Schema). Built early so every API route is born documented
+ * and stays the MCP/SDK substrate. No schema is hand-written here.
  */
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const
 type HttpMethod = (typeof HTTP_METHODS)[number]
+
+// Route → capability (the body-schema source, shared with the MCP face).
+const CAP_BY_ROUTE = new Map(CAPABILITIES.map((c) => [c.route, c]))
+const bodySchema = (route: string): object | null => {
+  const cap = CAP_BY_ROUTE.get(route)
+  if (!cap || route.startsWith('GET ')) return null // GETs carry no request body
+  return zodToJsonSchema(cap.input, { $refStrategy: 'none', target: 'openApi3' })
+}
 
 type Operation = {
   operationId: string
   summary: string
   tags: string[]
   security: Array<Record<string, string[]>>
+  requestBody?: { required: true; content: { 'application/json': { schema: object } } }
   responses: Record<string, unknown>
 }
 type PathItem = Partial<Record<HttpMethod, Operation>>
@@ -101,11 +112,14 @@ export function buildOpenApiDocument(opts: { serverUrl?: string } = {}): OpenApi
       item = {}
       paths[openApiPath] = item
     }
+    const cap = CAP_BY_ROUTE.get(key)
+    const body = bodySchema(key)
     item[m] = {
       operationId: operationId(method, rawPath),
-      summary: `${method} ${rawPath}`,
+      summary: cap?.summary ?? `${method} ${rawPath}`,
       tags: [tagFor(rawPath)],
       security: securityFor(entry),
+      ...(body ? { requestBody: { required: true, content: { 'application/json': { schema: body } } } } : {}),
       responses: standardResponses(),
     }
   }

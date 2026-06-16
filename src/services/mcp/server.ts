@@ -1,28 +1,41 @@
 import { z, ZodError } from 'zod'
+import { zodToJsonSchema } from 'zod-to-json-schema'
 import type { Database } from '../../../config/db'
 import type { SessionContext } from '@/services/identity/service'
 import type { WorkosClient } from '@/tools/workos/client'
 import { decideRbac, policyFor } from '@/config/rbacPolicy'
+import {
+  CAPABILITIES,
+  bookArgs,
+  createAssignmentArgs,
+  createTimesheetArgs,
+  createVendorArgs,
+  createWorkerArgs,
+  createWorkOrderArgs,
+  endAssignmentArgs,
+  getTimesheetArgs,
+  getVendorArgs,
+  getWorkerArgs,
+  getWorkOrderArgs,
+  linkPoArgs,
+  timesheetActionArgs,
+  transitionWorkOrderArgs,
+} from '@/config/capabilities'
 import { logger, serializeError } from '@/utils/logger'
 import { buildAdminDeps } from '@/services/admin/deps'
 import { listMembers } from '@/services/admin/service'
 import { buildWorkOrderDeps } from '@/services/workOrder/deps'
 import { createWorkOrder, getWorkOrder, transitionWorkOrder } from '@/services/workOrder/service'
-import { createWorkOrderSchema } from '@/services/workOrder/schema'
-import { WO_TRANSITIONS } from '@/services/workOrder/machine'
 import { buildTimesheetDeps } from '@/services/timesheet/deps'
 import { createTimesheet, getTimesheet, transitionTimesheet } from '@/services/timesheet/service'
-import { createTimesheetSchema } from '@/services/timesheet/schema'
 import type { TimesheetTransition } from '@/services/timesheet/machine'
 import { buildErpDeps } from '@/services/erp/deps'
 import { bookTimesheet, linkPurchaseOrder } from '@/services/erp/service'
 import { buildStaffingDeps } from '@/services/staffing/deps'
 import { createAssignment, createVendor, createWorker, endAssignment, getVendor, getWorker } from '@/services/staffing/service'
-import { createAssignmentSchema, createVendorSchema, createWorkerSchema } from '@/services/staffing/schema'
 
 // Minimal MCP over JSON-RPC 2.0 (Streamable HTTP). Stateless: one request → one
-// response. Covers initialize / tools.list / tools.call — a governed agent
-// surface without a Durable Object.
+// response. Covers initialize / tools.list / tools.call — a governed agent surface.
 export type JsonRpcRequest = {
   jsonrpc: '2.0'
   id?: string | number | null | undefined
@@ -38,263 +51,127 @@ type JsonRpcResponse = {
 
 export type McpDeps = { db: Database; workos: WorkosClient }
 
-// A tool runs with the AGENT's SessionContext. `route` is the HTTP route it
-// mirrors — its RBAC and read/write scope DERIVE from RBAC_POLICY (one SSOT, so
-// the API and MCP faces cannot disagree; gate:mcp asserts the route exists). A
-// tool with no route is authenticated-only (e.g. whoami).
+// A tool runs with the AGENT's SessionContext. `route` joins to RBAC_POLICY (RBAC
+// + read/write scope derive from it) and to the capability registry (the input
+// schema is generated from the capability's Zod — never hand-written here).
 export type McpTool = {
   name: string
   description: string
   inputSchema: object
-  route?: string // 'METHOD /path' — must be present in RBAC_POLICY
+  route?: string
   run(ctx: SessionContext, deps: McpDeps, args: unknown): Promise<unknown>
 }
 
-// A scoped token narrows what its agent may do; an unscoped token (no `scope`
-// claim) is full delegation. 'write' implies 'read'.
+type McpRun = McpTool['run']
+
 function scopeGrants(tokenScopes: readonly string[] | undefined, need: 'read' | 'write'): boolean {
   if (!tokenScopes || tokenScopes.length === 0) return true
   const has = (cap: string) => tokenScopes.some((s) => s === cap || s === `vms:${cap}` || s.endsWith(`:${cap}`))
   return need === 'read' ? has('read') || has('write') : has('write')
 }
 
-const NO_ARGS = { type: 'object', properties: {} } as const
+const toJsonSchema = (schema: z.ZodTypeAny): object => zodToJsonSchema(schema, { $refStrategy: 'none' })
 
-const woTransitionArgs = z.object({
-  id: z.string().uuid(),
-  transition: z.enum(WO_TRANSITIONS),
-  expectedVersion: z.number().int().min(1),
-  idempotencyKey: z.string().optional(),
-})
-
-const tsActionArgs = z.object({
-  id: z.string().uuid(),
-  expectedVersion: z.number().int().min(1),
-  reason: z.string().optional(),
-  idempotencyKey: z.string().optional(),
-})
-
-// Per-action timesheet tool — 1:1 with the REST action route, so RBAC is single-sourced.
-function timesheetTransitionTool(name: string, transition: TimesheetTransition, route: string): McpTool {
-  return {
-    name,
-    route,
-    description: `${transition} a timesheet (governed by ${route}).`,
-    inputSchema: {
-      type: 'object',
-      properties: { id: { type: 'string' }, expectedVersion: { type: 'integer' }, reason: { type: 'string' }, idempotencyKey: { type: 'string' } },
-      required: ['id', 'expectedVersion'],
-    },
-    run: async (ctx, deps, args) => {
-      const a = tsActionArgs.parse(args)
-      const result = await transitionTimesheet(
-        ctx,
-        { timesheetId: a.id, transition, expectedVersion: a.expectedVersion, eventId: a.idempotencyKey ?? crypto.randomUUID(), ...(a.reason ? { reason: a.reason } : {}) },
-        buildTimesheetDeps(deps.db, 'agent'),
-      )
-      return result.ok ? result.value : { error: result.error.kind }
-    },
-  }
+// ── Run handlers (the only hand-written per-capability code — the service wiring).
+// Each parses the capability's args schema, so validation can't diverge from the
+// advertised inputSchema (both derive from the same Zod).
+const tsAction = (transition: TimesheetTransition): McpRun => async (ctx, deps, args) => {
+  const a = timesheetActionArgs.parse(args)
+  const result = await transitionTimesheet(
+    ctx,
+    { timesheetId: a.id, transition, expectedVersion: a.expectedVersion, eventId: a.idempotencyKey ?? crypto.randomUUID(), ...(a.reason ? { reason: a.reason } : {}) },
+    buildTimesheetDeps(deps.db, 'agent'),
+  )
+  return result.ok ? result.value : { error: result.error.kind }
 }
 
-export const TOOLS: readonly McpTool[] = [
-  {
-    name: 'whoami',
-    description: "Return the calling agent's resolved identity, tenant and roles.",
-    inputSchema: NO_ARGS,
-    run: async (ctx) => ({ userId: ctx.userId, tenantId: ctx.tenantId, roles: ctx.roles, activeRole: ctx.activeRole, actorKind: 'agent' }),
+const RUN: Readonly<Record<string, McpRun>> = {
+  'GET /admin/users': async (ctx, deps) => {
+    const members = await listMembers(
+      { tenantId: ctx.tenantId, userId: ctx.userId, sessionId: ctx.sessionId },
+      buildAdminDeps(deps.db, deps.workos),
+    )
+    return members.map((m) => ({ email: m.email, roles: m.roles, active: m.isActive }))
   },
-  {
-    name: 'list_members',
-    description: 'List the members of the tenant and their roles.',
-    inputSchema: NO_ARGS,
-    route: 'GET /admin/users',
-    run: async (ctx, deps) => {
-      const members = await listMembers(
-        { tenantId: ctx.tenantId, userId: ctx.userId, sessionId: ctx.sessionId },
-        buildAdminDeps(deps.db, deps.workos),
-      )
-      return members.map((m) => ({ email: m.email, roles: m.roles, active: m.isActive }))
-    },
+  'GET /api/v1/work-orders/:id': async (ctx, deps, args) => {
+    const { id } = getWorkOrderArgs.parse(args)
+    return (await getWorkOrder(ctx, id, buildWorkOrderDeps(deps.db, 'agent'))) ?? { error: 'not_found' }
   },
-  {
-    name: 'get_work_order',
-    description: 'Fetch a work order by id (tenant-scoped).',
-    inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
-    route: 'GET /api/v1/work-orders/:id',
-    run: async (ctx, deps, args) => {
-      const { id } = z.object({ id: z.string().uuid() }).parse(args)
-      const wo = await getWorkOrder(ctx, id, buildWorkOrderDeps(deps.db, 'agent'))
-      return wo ?? { error: 'not_found' }
-    },
+  'POST /api/v1/work-orders': async (ctx, deps, args) => {
+    const result = await createWorkOrder(ctx, createWorkOrderArgs.parse(args), buildWorkOrderDeps(deps.db, 'agent'))
+    return result.ok ? result.value : { error: result.error.kind }
   },
-  {
-    name: 'create_work_order',
-    description: 'Create a draft work order with lines.',
-    inputSchema: { type: 'object', properties: { code: { type: 'string' }, lines: { type: 'array' } }, required: ['code', 'lines'] },
-    route: 'POST /api/v1/work-orders',
-    run: async (ctx, deps, args) => {
-      const input = createWorkOrderSchema.parse(args)
-      const result = await createWorkOrder(ctx, input, buildWorkOrderDeps(deps.db, 'agent'))
-      return result.ok ? result.value : { error: result.error.kind }
-    },
+  'POST /api/v1/work-orders/:id/transitions': async (ctx, deps, args) => {
+    const a = transitionWorkOrderArgs.parse(args)
+    const result = await transitionWorkOrder(ctx, { workOrderId: a.id, transition: a.transition, expectedVersion: a.expectedVersion, eventId: a.idempotencyKey ?? crypto.randomUUID() }, buildWorkOrderDeps(deps.db, 'agent'))
+    return result.ok ? result.value : { error: result.error.kind }
   },
-  {
-    name: 'transition_work_order',
-    description: 'Apply a lifecycle transition to a work order.',
-    inputSchema: {
-      type: 'object',
-      properties: { id: { type: 'string' }, transition: { type: 'string', enum: WO_TRANSITIONS }, expectedVersion: { type: 'integer' }, idempotencyKey: { type: 'string' } },
-      required: ['id', 'transition', 'expectedVersion'],
-    },
-    route: 'POST /api/v1/work-orders/:id/transitions',
-    run: async (ctx, deps, args) => {
-      const a = woTransitionArgs.parse(args)
-      const result = await transitionWorkOrder(
-        ctx,
-        { workOrderId: a.id, transition: a.transition, expectedVersion: a.expectedVersion, eventId: a.idempotencyKey ?? crypto.randomUUID() },
-        buildWorkOrderDeps(deps.db, 'agent'),
-      )
-      return result.ok ? result.value : { error: result.error.kind }
-    },
+  'GET /api/v1/timesheets/:id': async (ctx, deps, args) => {
+    const { id } = getTimesheetArgs.parse(args)
+    return (await getTimesheet(ctx, id, buildTimesheetDeps(deps.db, 'agent'))) ?? { error: 'not_found' }
   },
-  {
-    name: 'get_timesheet',
-    description: 'Fetch a timesheet by id (tenant-scoped).',
-    inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
-    route: 'GET /api/v1/timesheets/:id',
-    run: async (ctx, deps, args) => {
-      const { id } = z.object({ id: z.string().uuid() }).parse(args)
-      const ts = await getTimesheet(ctx, id, buildTimesheetDeps(deps.db, 'agent'))
-      return ts ?? { error: 'not_found' }
-    },
+  'POST /api/v1/timesheets': async (ctx, deps, args) => {
+    const result = await createTimesheet(ctx, createTimesheetArgs.parse(args), buildTimesheetDeps(deps.db, 'agent'))
+    return result.ok ? result.value : { error: result.error.kind }
   },
-  {
-    name: 'create_timesheet',
-    description: 'Create a draft timesheet for a work order line.',
-    inputSchema: {
-      type: 'object',
-      properties: { workOrderLineId: { type: 'string' }, periodStart: { type: 'string' }, periodEnd: { type: 'string' }, lines: { type: 'array' } },
-      required: ['workOrderLineId', 'periodStart', 'periodEnd', 'lines'],
-    },
-    route: 'POST /api/v1/timesheets',
-    run: async (ctx, deps, args) => {
-      const input = createTimesheetSchema.parse(args)
-      const result = await createTimesheet(ctx, input, buildTimesheetDeps(deps.db, 'agent'))
-      return result.ok ? result.value : { error: result.error.kind }
-    },
+  'POST /api/v1/timesheets/:id/submit': tsAction('submit'),
+  'POST /api/v1/timesheets/:id/approve': tsAction('approve'),
+  'POST /api/v1/timesheets/:id/reject': tsAction('reject'),
+  'POST /api/v1/timesheets/:id/revise': tsAction('revise'),
+  'POST /api/v1/work-orders/:id/link-po': async (ctx, deps, args) => {
+    const a = linkPoArgs.parse(args)
+    const result = await linkPurchaseOrder(ctx, { workOrderId: a.id, poCode: a.poCode, expectedVersion: a.expectedVersion, eventId: a.idempotencyKey ?? crypto.randomUUID() }, buildErpDeps(deps.db, 'agent'))
+    return result.ok ? result.value : { error: result.error.kind }
   },
-  timesheetTransitionTool('submit_timesheet', 'submit', 'POST /api/v1/timesheets/:id/submit'),
-  timesheetTransitionTool('approve_timesheet', 'approve', 'POST /api/v1/timesheets/:id/approve'),
-  timesheetTransitionTool('reject_timesheet', 'reject', 'POST /api/v1/timesheets/:id/reject'),
-  timesheetTransitionTool('revise_timesheet', 'revise', 'POST /api/v1/timesheets/:id/revise'),
-  {
-    name: 'link_purchase_order',
-    description: 'Link a PO to a work order (ERP-link UNLINKED→LINKED).',
-    inputSchema: {
-      type: 'object',
-      properties: { id: { type: 'string' }, poCode: { type: 'string' }, expectedVersion: { type: 'integer' }, idempotencyKey: { type: 'string' } },
-      required: ['id', 'poCode', 'expectedVersion'],
-    },
-    route: 'POST /api/v1/work-orders/:id/link-po',
-    run: async (ctx, deps, args) => {
-      const a = z.object({ id: z.string().uuid(), poCode: z.string().min(1).max(100), expectedVersion: z.number().int().min(1), idempotencyKey: z.string().optional() }).parse(args)
-      const result = await linkPurchaseOrder(
-        ctx,
-        { workOrderId: a.id, poCode: a.poCode, expectedVersion: a.expectedVersion, eventId: a.idempotencyKey ?? crypto.randomUUID() },
-        buildErpDeps(deps.db, 'agent'),
-      )
-      return result.ok ? result.value : { error: result.error.kind }
-    },
+  'POST /api/v1/timesheets/:id/book': async (ctx, deps, args) => {
+    const a = bookArgs.parse(args)
+    const result = await bookTimesheet(ctx, { timesheetId: a.id, expectedVersion: a.expectedVersion, eventId: a.idempotencyKey ?? crypto.randomUUID() }, buildErpDeps(deps.db, 'agent'))
+    return result.ok ? result.value : { error: result.error.kind }
   },
-  {
-    name: 'book_timesheet',
-    description: 'Book an APPROVED timesheet to ERP (gated on the WO being LINKED).',
-    inputSchema: {
-      type: 'object',
-      properties: { id: { type: 'string' }, expectedVersion: { type: 'integer' }, idempotencyKey: { type: 'string' } },
-      required: ['id', 'expectedVersion'],
-    },
-    route: 'POST /api/v1/timesheets/:id/book',
-    run: async (ctx, deps, args) => {
-      const a = z.object({ id: z.string().uuid(), expectedVersion: z.number().int().min(1), idempotencyKey: z.string().optional() }).parse(args)
-      const result = await bookTimesheet(
-        ctx,
-        { timesheetId: a.id, expectedVersion: a.expectedVersion, eventId: a.idempotencyKey ?? crypto.randomUUID() },
-        buildErpDeps(deps.db, 'agent'),
-      )
-      return result.ok ? result.value : { error: result.error.kind }
-    },
+  'GET /api/v1/vendors/:id': async (ctx, deps, args) => {
+    const { id } = getVendorArgs.parse(args)
+    return (await getVendor(ctx, id, buildStaffingDeps(deps.db, 'agent'))) ?? { error: 'not_found' }
   },
-  {
-    name: 'get_vendor',
-    description: 'Fetch a vendor by id (tenant-scoped).',
-    inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
-    route: 'GET /api/v1/vendors/:id',
-    run: async (ctx, deps, args) => {
-      const { id } = z.object({ id: z.string().uuid() }).parse(args)
-      return (await getVendor(ctx, id, buildStaffingDeps(deps.db, 'agent'))) ?? { error: 'not_found' }
-    },
+  'POST /api/v1/vendors': async (ctx, deps, args) => {
+    const result = await createVendor(ctx, createVendorArgs.parse(args), buildStaffingDeps(deps.db, 'agent'))
+    return result.ok ? result.value : { error: result.error.kind }
   },
-  {
-    name: 'create_vendor',
-    description: 'Onboard a vendor (supplier org).',
-    inputSchema: { type: 'object', properties: { code: { type: 'string' }, name: { type: 'string' }, vatNumber: { type: 'string' } }, required: ['code', 'name'] },
-    route: 'POST /api/v1/vendors',
-    run: async (ctx, deps, args) => {
-      const input = createVendorSchema.parse(args)
-      const result = await createVendor(ctx, input, buildStaffingDeps(deps.db, 'agent'))
-      return result.ok ? result.value : { error: result.error.kind }
-    },
+  'GET /api/v1/workers/:id': async (ctx, deps, args) => {
+    const { id } = getWorkerArgs.parse(args)
+    return (await getWorker(ctx, id, buildStaffingDeps(deps.db, 'agent'))) ?? { error: 'not_found' }
   },
-  {
-    name: 'get_worker',
-    description: "Fetch a worker by id, with the person's name/email resolved in-tenant.",
-    inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
-    route: 'GET /api/v1/workers/:id',
-    run: async (ctx, deps, args) => {
-      const { id } = z.object({ id: z.string().uuid() }).parse(args)
-      return (await getWorker(ctx, id, buildStaffingDeps(deps.db, 'agent'))) ?? { error: 'not_found' }
-    },
+  'POST /api/v1/workers': async (ctx, deps, args) => {
+    const result = await createWorker(ctx, createWorkerArgs.parse(args), buildStaffingDeps(deps.db, 'agent'))
+    return result.ok ? result.value : { error: result.error.kind }
   },
-  {
-    name: 'create_worker',
-    description: 'Create a worker under a vendor (person-PII is isolated to the sensitive schema).',
-    inputSchema: { type: 'object', properties: { vendorId: { type: 'string' }, name: { type: 'string' }, email: { type: 'string' }, skillCode: { type: 'string' }, seniorityCode: { type: 'string' } }, required: ['vendorId', 'name'] },
-    route: 'POST /api/v1/workers',
-    run: async (ctx, deps, args) => {
-      const input = createWorkerSchema.parse(args)
-      const result = await createWorker(ctx, input, buildStaffingDeps(deps.db, 'agent'))
-      return result.ok ? result.value : { error: result.error.kind }
-    },
+  'POST /api/v1/assignments': async (ctx, deps, args) => {
+    const result = await createAssignment(ctx, createAssignmentArgs.parse(args), buildStaffingDeps(deps.db, 'agent'))
+    return result.ok ? result.value : { error: result.error.kind }
   },
-  {
-    name: 'create_assignment',
-    description: 'Assign a worker to a work order line (enforces the I6 capacity cap).',
-    inputSchema: { type: 'object', properties: { workOrderLineId: { type: 'string' }, workerId: { type: 'string' }, plannedDays: { type: 'number' }, startDate: { type: 'string' }, endDate: { type: 'string' } }, required: ['workOrderLineId', 'workerId', 'plannedDays', 'startDate', 'endDate'] },
-    route: 'POST /api/v1/assignments',
-    run: async (ctx, deps, args) => {
-      const input = createAssignmentSchema.parse(args)
-      const result = await createAssignment(ctx, input, buildStaffingDeps(deps.db, 'agent'))
-      return result.ok ? result.value : { error: result.error.kind }
-    },
+  'POST /api/v1/assignments/:id/end': async (ctx, deps, args) => {
+    const a = endAssignmentArgs.parse(args)
+    const result = await endAssignment(ctx, { assignmentId: a.id, expectedVersion: a.expectedVersion, eventId: a.idempotencyKey ?? crypto.randomUUID(), ...(a.endReason ? { endReason: a.endReason } : {}) }, buildStaffingDeps(deps.db, 'agent'))
+    return result.ok ? result.value : { error: result.error.kind }
   },
-  {
-    name: 'end_assignment',
-    description: 'End an assignment (PENDING/ACTIVE → ENDED with a reason).',
-    inputSchema: { type: 'object', properties: { id: { type: 'string' }, expectedVersion: { type: 'integer' }, endReason: { type: 'string' }, idempotencyKey: { type: 'string' } }, required: ['id', 'expectedVersion'] },
-    route: 'POST /api/v1/assignments/:id/end',
-    run: async (ctx, deps, args) => {
-      const a = z.object({ id: z.string().uuid(), expectedVersion: z.number().int().min(1), endReason: z.string().optional(), idempotencyKey: z.string().optional() }).parse(args)
-      const result = await endAssignment(
-        ctx,
-        { assignmentId: a.id, expectedVersion: a.expectedVersion, eventId: a.idempotencyKey ?? crypto.randomUUID(), ...(a.endReason ? { endReason: a.endReason } : {}) },
-        buildStaffingDeps(deps.db, 'agent'),
-      )
-      return result.ok ? result.value : { error: result.error.kind }
-    },
-  },
-]
+}
+
+// whoami is the one tool with no HTTP route — authenticated-only, no args.
+const whoami: McpTool = {
+  name: 'whoami',
+  description: "Return the calling agent's resolved identity, tenant and roles.",
+  inputSchema: { type: 'object', properties: {} },
+  run: async (ctx) => ({ userId: ctx.userId, tenantId: ctx.tenantId, roles: ctx.roles, activeRole: ctx.activeRole, actorKind: 'agent' }),
+}
+
+// Tools are PROJECTIONS of the capability registry: name/description/inputSchema
+// all derive from the capability; only the run handler is hand-written.
+const routedTools: McpTool[] = CAPABILITIES.flatMap((cap) => {
+  const run = cap.mcp ? RUN[cap.route] : undefined
+  if (!cap.mcp || !run) return []
+  return [{ name: cap.mcp.name, description: cap.mcp.description, inputSchema: toJsonSchema(cap.mcp.args), route: cap.route, run }]
+})
+
+export const TOOLS: readonly McpTool[] = [whoami, ...routedTools]
 
 const ok = (id: JsonRpcResponse['id'], result: unknown): JsonRpcResponse => ({ jsonrpc: '2.0', id, result })
 const fail = (id: JsonRpcResponse['id'], code: number, message: string): JsonRpcResponse => ({ jsonrpc: '2.0', id, error: { code, message } })
@@ -322,11 +199,10 @@ export async function handleMcpRequest(
   }
 }
 
-// Authorize a tool from the SAME RBAC_POLICY the HTTP wall uses (one SSOT), plus
-// the read/write scope derived from the route's method. Returns an error string
-// when denied, else null.
+// Authorize from the SAME RBAC_POLICY the HTTP wall uses (one SSOT), plus the
+// read/write scope derived from the route's method.
 function authorizeTool(tool: McpTool, ctx: SessionContext): string | null {
-  if (!tool.route) return null // authenticated-only (the agent is already authenticated)
+  if (!tool.route) return null
   const [method, path] = tool.route.split(' ')
   if (!method || !path) return `misconfigured tool route: ${tool.route}`
   const decision = decideRbac(policyFor(method, path), { authenticated: true, roles: ctx.roles })
@@ -350,8 +226,6 @@ async function callTool(
   try {
     return toolText(id, await tool.run(ctx, deps, args))
   } catch (err) {
-    // Boundary redaction (matches the API): validation detail is the agent's own
-    // input (safe); anything else is logged with the trace and returned generic.
     if (err instanceof ZodError) return toolText(id, { error: 'invalid arguments', details: err.flatten() }, true)
     logger.error('mcp.tool_failed', { tool: tool.name, ...serializeError(err) })
     return toolText(id, { error: 'tool execution failed' }, true)

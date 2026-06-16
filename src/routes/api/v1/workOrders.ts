@@ -4,17 +4,13 @@ import { z } from 'zod'
 import type { AppEnv } from '../../../../config/bindings'
 import { buildWorkOrderDeps } from '@/services/workOrder/deps'
 import { createWorkOrder, getWorkOrder, transitionWorkOrder } from '@/services/workOrder/service'
-import { createWorkOrderSchema, type WorkOrderError } from '@/services/workOrder/schema'
-import { WO_TRANSITIONS } from '@/services/workOrder/machine'
+import { createWorkOrderSchema, transitionWorkOrderBodySchema, type WorkOrderError } from '@/services/workOrder/schema'
 import { workOrderErrorCode } from '@/services/workOrder/httpError'
 import { problemResponse } from '@/utils/problemResponse'
 import { randomId } from '@/utils/ids'
 import { requireSession } from './_shared'
 
-const transitionSchema = z.object({
-  transition: z.enum(WO_TRANSITIONS),
-  expectedVersion: z.number().int().min(1),
-})
+const transitionSchema = transitionWorkOrderBodySchema
 
 // A WorkOrderError → problem+json, surfacing the registered domain code (and the
 // transition context when relevant) so clients/agents can react precisely.
